@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { createDryRunAdapter } from "../src/throttle/adapter.ts";
+import { classifyLiveFailure, createDryRunAdapter } from "../src/throttle/adapter.ts";
 import { runThrottleLoop } from "../src/throttle/loop.ts";
 import { learn, plannedBurst, shouldSplitBurst, summarizeOutcomes } from "../src/throttle/policy.ts";
 import { SAFE_POLICY, type Clock, type RatePolicy, type TicketOutcome } from "../src/throttle/types.ts";
@@ -95,6 +95,21 @@ test("dry-run injects 429s and the next policy backs off", async () => {
   assert.ok(result.outcomes.some((item) => item.status === "throttled" && item.httpStatus === 429));
   assert.ok(result.policy.currentRatePerSec < 4);
   assert.match(result.policy.reason, /backoff/);
+});
+
+test("live 403 after push is opened, not a throttle/error backoff", () => {
+  assert.deepEqual(classifyLiveFailure("Resource not accessible by integration (createPullRequest)", true), {
+    status: "opened",
+    httpStatus: 201,
+  });
+  assert.deepEqual(classifyLiveFailure("HTTP 429 rate limit", true), {
+    status: "throttled",
+    httpStatus: 429,
+  });
+  assert.deepEqual(classifyLiveFailure("boom", false), {
+    status: "error",
+    httpStatus: 500,
+  });
 });
 
 test("shouldSplitBurst is recursive only when depth remains", () => {

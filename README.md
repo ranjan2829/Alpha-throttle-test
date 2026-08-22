@@ -117,6 +117,8 @@ npx tsx src/cli.ts run --goal "<goal>" --workspace .alpha/<slug> --adapter files
 
 `--adapter files` times out if a child never writes a handoff (default 8s locally; raise it for live agents). `--adapter local` is the smoke path and does not hang: children are in-process node runners.
 
+Live ticket opens: the adapter pushes `cursor/throttle-<id>-ec34`. If `gh pr create` is forbidden for the integration token, the outcome is still `opened` (branch shipped) with a compare URL. Origin/cloud agents can finish the PR with the Cursor PR tool. A user PAT that can create PRs makes `--live` fully self-serve.
+
 **Do not** let workers call each other, share a chat, or read sibling `nodes/` directories. Relay happens only through declared `dependsOn` handoffs that the parent pastes into the child context.
 
 ## Handoff shape

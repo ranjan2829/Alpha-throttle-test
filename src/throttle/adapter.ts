@@ -70,11 +70,29 @@ export interface LiveAdapterOptions {
   baseBranch: string;
 }
 
+export function compareUrl(owner: string, repo: string, base: string, head: string): string {
+  return `https://github.com/${owner}/${repo}/compare/${base}...${head}`;
+}
+
+export function classifyLiveFailure(message: string, pushed: boolean): {
+  status: TicketOutcome["status"];
+  httpStatus: number;
+} {
+  if (/429|rate limit|secondary rate/i.test(message)) {
+    return { status: "throttled", httpStatus: 429 };
+  }
+  if (pushed && /not accessible by integration|HTTP 403|Resource not accessible/i.test(message)) {
+    return { status: "opened", httpStatus: 201 };
+  }
+  return { status: "error", httpStatus: 500 };
+}
+
 export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
   return {
     kind: "live",
     async openTicket(ticket: TicketSpec): Promise<TicketOutcome> {
       const started = options.clock.nowMs();
+      let pushed = false;
       try {
         const work = join(options.repoDir, ".alpha", "worktrees", ticket.ticketId);
         mkdirSync(join(options.repoDir, ".alpha", "worktrees"), { recursive: true });
@@ -93,6 +111,7 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
         await run(work, ["git", "add", ticket.path]);
         await run(work, ["git", "commit", "-m", ticket.title]);
         await run(work, ["git", "push", "-u", "origin", ticket.branch]);
+        pushed = true;
         const created = await run(work, [
           "gh",
           "pr",
@@ -122,18 +141,20 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : "live open failed";
-        const throttled = /429|rate limit|secondary rate/i.test(message);
+        const classified = classifyLiveFailure(message, pushed);
         return {
           ticketId: ticket.ticketId,
           seq: ticket.seq,
           branch: ticket.branch,
-          status: throttled ? "throttled" : "error",
+          status: classified.status,
           prNumber: null,
-          prUrl: null,
-          httpStatus: throttled ? 429 : 500,
+          prUrl: pushed
+            ? compareUrl(options.owner, options.repo, options.baseBranch, ticket.branch)
+            : null,
+          httpStatus: classified.httpStatus,
           latencyMs: options.clock.nowMs() - started,
           mergeMs: null,
-          error: message,
+          error: classified.status === "opened" ? "branch pushed; gh pr create forbidden for this token" : message,
         };
       }
     },
