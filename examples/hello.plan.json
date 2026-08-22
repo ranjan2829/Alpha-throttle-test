@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "goal": "Write a hello artifact",
+  "summary": "smoke-sized worker plus verifier",
+  "rootSlug": "hello",
+  "bounds": {
+    "maxDepth": 2,
+    "maxConcurrentChildren": 2,
+    "maxResawnsPerTask": 1
+  },
+  "tasks": [
+    {
+      "name": "write-hello",
+      "type": "worker",
+      "scopedGoal": "Write a hello artifact",
+      "acceptance": ["artifact exists", "contains:hello"],
+      "dependsOn": []
+    },
+    {
+      "name": "verify-write-hello",
+      "type": "verifier",
+      "verifies": "write-hello",
+      "scopedGoal": "Verify the hello artifact",
+      "acceptance": ["artifact exists", "contains:hello"],
+      "dependsOn": ["write-hello"]
+    }
+  ],
+  "done": false
+}
