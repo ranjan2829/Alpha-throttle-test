@@ -139,6 +139,62 @@ A verifier adds `"verdict": "accept" | "reject"` and, on reject, `"rejectReason"
 
 Machine-checkable acceptance used by the local runner: `contains:<token>` must appear as a `contains:<token>` line in the worker's artifact or summary.
 
+## Throttle + learn
+
+The same planner → worker → verifier tree can saturate **PR open** as a platform test. "1000s of PRs a second" is the measurement target, not a promise. Workers open isolated branches with a one-line `tickets/NNNN.md`. Verifiers read open / merge / reject / 429 outcomes. The planner writes `rates.json` and the next burst uses that policy.
+
+Defaults are **safe**: dry-run, no GitHub writes.
+
+```bash
+# Dry-run (default). Learns across episodes. Never opens PRs.
+npx tsx src/cli.ts throttle --workspace .alpha/throttle
+
+# Inject simulated 429s to see backoff
+npx tsx src/cli.ts throttle --throttle-after 2 --rate 4 --max 6 --episodes 2
+
+# Live proof. Without --max, live is capped at 3 PRs.
+npx tsx src/cli.ts throttle --live --rate 1 --max 3
+
+# Later saturation attempt (you raise the flags; the agent must not)
+npx tsx src/cli.ts throttle --live --rate 1000 --max 50 --concurrency 10
+```
+
+| Flag | Dry-run default | Live default | Meaning |
+| --- | --- | --- | --- |
+| (no `--live`) | on | — | Dry-run adapter; no `git push`, no `gh pr create` |
+| `--live` | off | required | Real branches + PRs |
+| `--rate` | `2` /s | `2` /s | Planned burst size (`floor(rate)`, then caps) |
+| `--max` | `8` | **`3`** | Hard cap of PRs/tickets this invocation |
+| `--concurrency` | `2` | `2` | In-flight ticket workers |
+| `--episodes` | `3` | `1` | Learn-and-repeat bursts |
+
+Policy file (written after every episode):
+
+```
+.alpha/throttle/rates.json
+.alpha/throttle/episodes.jsonl
+.alpha/throttle/handoffs/ticket-0001.json
+```
+
+Learning rule:
+
+- Any 429 / throttle, or error ratio > 30% → `rate *= 0.5`, `concurrency -= 1`
+- Clean burst → `rate *= 1.25`, maybe `concurrency += 1` (still capped by `maxOpenPrs`)
+- Burst size is `min(floor(rate), remaining --max, maxOpenPrs)`
+- Bursts of 4+ split into subplanners while `depth + 1 < maxDepth`
+
+### Origin / cloud-agent usage (throttle)
+
+You are the planner. Run the CLI; do not open PRs by hand.
+
+1. `npm install && npm test`
+2. Dry-run first: `npx tsx src/cli.ts throttle`
+3. Read `rates.json` and `handoffs/`. That is the feedback.
+4. Pass `--live` only if the user asked. Keep their `--max` / `--rate`.
+5. Stop after the live cap. Leave the saturation command for a human.
+
+Workers still do not talk to each other. Each ticket is one branch, one file, one handoff.
+
 ## What this is not
 
 - Not a wrapper that dumps the whole goal into one agent session.

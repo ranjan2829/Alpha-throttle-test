@@ -13,6 +13,7 @@
   "scripts": {
     "orch": "tsx src/cli.ts",
     "smoke": "tsx src/cli.ts smoke",
+    "throttle": "tsx src/cli.ts throttle",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
