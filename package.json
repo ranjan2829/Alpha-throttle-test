@@ -1,0 +1,24 @@
+{
+  "name": "alpha-throttle-test",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Bounded recursive planner → worker → verifier harness for Cursor Origin / cloud agents.",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "alpha-orch": "./src/cli.ts"
+  },
+  "scripts": {
+    "orch": "tsx src/cli.ts",
+    "smoke": "tsx src/cli.ts smoke",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
