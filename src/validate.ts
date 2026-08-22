@@ -145,20 +145,20 @@ export function validateTaskGraph(tasks: PlanTask[]): void {
   }
   const byName = new Map(tasks.map((task) => [task.name, task]));
   for (const task of tasks) {
-    for (const dep of normalizedDependsOn(task)) {
-      if (!names.has(dep)) {
-        throw new PlanValidationError(`${task.name} dependsOn unknown task: ${dep}`);
-      }
-      if (dep === task.name) {
-        throw new PlanValidationError(`${task.name} dependsOn itself`);
-      }
-    }
     if (task.type === "verifier") {
       if (task.verifies === task.name) {
         throw new PlanValidationError(`${task.name} cannot verify itself`);
       }
       if (task.verifies && !byName.has(task.verifies)) {
         throw new PlanValidationError(`${task.name} verifies unknown task: ${task.verifies}`);
+      }
+    }
+    for (const dep of normalizedDependsOn(task)) {
+      if (!names.has(dep)) {
+        throw new PlanValidationError(`${task.name} dependsOn unknown task: ${dep}`);
+      }
+      if (dep === task.name) {
+        throw new PlanValidationError(`${task.name} dependsOn itself`);
       }
     }
   }
@@ -286,7 +286,7 @@ function parseEvent(value: JsonValue, label: string): RunEvent {
   return {
     at: requireString(value, "at"),
     kind: requireString(value, "kind"),
-    taskName: optionalString(value, "taskName") ?? null,
+    taskName: optionalNullableString(value, "taskName") ?? null,
     message: requireString(value, "message"),
   };
 }
