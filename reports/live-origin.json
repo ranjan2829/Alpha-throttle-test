@@ -9,8 +9,10 @@
   "merged": 6457,
   "errors": 258,
   "throttled429": 0,
-  "wallMin": 38.5,
-  "mergedPerMin": 148,
-  "latestMergedPr": 6964,
+  "wallMin": 44.1,
+  "openedPerSec": 2.47,
+  "openedPerMin": 148,
+  "mergedPerSec": 2.44,
+  "mergedPerMin": 147,
   "status": "running"
 }
