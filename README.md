@@ -10,12 +10,12 @@ Live Origin run · 23 Aug 2026 · target **10 000** merged · still going
 
 | tried | PRs opened | merged | errors | 429s | time |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 6 800 | 6 542 | **6 457** | 258 | **0** | 44 min |
+| 7 600 | 7 290 | **7 336** | 310 | **0** | 51 min |
 
 | speed | per second | per minute |
 | --- | ---: | ---: |
-| PRs opened | **2.47** | **148** |
-| merged | **2.44** | **147** |
+| PRs opened | **2.40** | **144** |
+| merged | **2.41** | **145** |
 
 Author: Ranjan S `<ranjan@allocations.com>`
 
