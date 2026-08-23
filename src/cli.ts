@@ -2,7 +2,9 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { decomposeGoalMaybeClaude, policyForAgentTarget, resolveAgentTarget, writeAgentTree } from "./agent.ts";
 import { floatFlag, intFlag, parseArgs, type CliArgs } from "./args.ts";
+import { createClaudeClient, readClaudeApiKey } from "./claude.ts";
 import { PlanValidationError } from "./errors.ts";
 import { renderTree, runOrchestrator } from "./orchestrator.ts";
 import { decomposeGoal } from "./planner.ts";
@@ -31,6 +33,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return commandSmoke(args);
     case "throttle":
       return commandThrottle(args);
+    case "agent":
+      return commandAgent(args);
     case "origin-setup":
       return commandOriginSetup(args);
     case "origin-finish":
@@ -59,12 +63,22 @@ async function commandRun(args: CliArgs): Promise<number> {
   if (adapter !== "local" && adapter !== "files") {
     throw new PlanValidationError("--adapter must be local | files");
   }
+  const depth = intFlag(args, "depth", 0);
+  const claude = claudeFromArgs(args);
+  const plan = await decomposeGoalMaybeClaude({
+    goal,
+    bounds,
+    depth,
+    parentName: null,
+    claude,
+  });
   const result = await runOrchestrator({
     goal,
     workspace,
     bounds,
     adapter,
-    depth: intFlag(args, "depth", 0),
+    depth,
+    plan,
   });
   process.stdout.write(renderTree(result.state));
   process.stdout.write(`stopped: ${result.stoppedReason}\nworkspace: ${workspace}\n`);
@@ -167,9 +181,14 @@ async function commandSmoke(args: CliArgs): Promise<number> {
   return 0;
 }
 
-async function commandThrottle(args: CliArgs): Promise<number> {
+async function commandAgent(args: CliArgs): Promise<number> {
+  return commandThrottle(args, { agent: true });
+}
+
+async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent: false }): Promise<number> {
   const live = args.switches.has("live");
-  const workspace = args.flags.get("workspace") ?? join(process.cwd(), ".alpha", "throttle");
+  const workspace =
+    args.flags.get("workspace") ?? join(process.cwd(), ".alpha", mode.agent ? "agent" : "throttle");
   const maxDefault = live ? LIVE_DEFAULT_MAX : SAFE_POLICY.maxPrsPerRun;
   const maxPrsPerRun = args.flags.has("max") ? intFlag(args, "max", maxDefault) : maxDefault;
   const rate = args.flags.has("rate")
@@ -178,21 +197,21 @@ async function commandThrottle(args: CliArgs): Promise<number> {
   const concurrency = args.flags.has("concurrency")
     ? intFlag(args, "concurrency", SAFE_POLICY.concurrency)
     : SAFE_POLICY.concurrency;
+  const perMinute = args.flags.has("per-minute") ? intFlag(args, "per-minute", 0) : null;
+  const target = resolveAgentTarget({
+    perMinute,
+    ratePerSec: rate,
+    maxPrs: maxPrsPerRun,
+    concurrency,
+  });
   const maxEpisodes = args.flags.has("episodes")
     ? intFlag(args, "episodes", live ? 1 : 3)
     : live
       ? 1
       : 3;
   const clock = systemClock();
-  const policy = {
-    ...SAFE_POLICY,
-    currentRatePerSec: rate,
-    concurrency,
-    maxPrsPerRun,
-    maxOpenPrs: Math.max(SAFE_POLICY.maxOpenPrs, maxPrsPerRun, concurrency),
-    lastUpdated: clock.now(),
-    reason: live ? "cli --live" : "cli dry-run",
-  };
+  const burstAll = mode.agent || perMinute !== null;
+  const policy = policyForAgentTarget(target, clock.now(), live, burstAll);
   const forge = parseForgeFlag(args.flags.get("forge"));
   const repoFlag = args.flags.get("repo") ?? process.env.ALPHA_THROTTLE_REPO ?? DEFAULT_ORIGIN_REPO;
   const forgeRepo = parseRepoSlug(repoFlag, forge);
@@ -219,12 +238,29 @@ async function commandThrottle(args: CliArgs): Promise<number> {
         latencyMs: intFlag(args, "latency-ms", 0),
       });
 
+  const claude = claudeFromArgs(args);
+  const planner = claude ? "claude" : "deterministic";
+  if (mode.agent) {
+    writeAgentTree(workspace, {
+      planner,
+      depth: 0,
+      maxDepth: intFlag(args, "max-depth", 3),
+      tickets: target.maxPrs,
+      note: claude
+        ? "Claude splits the burst; leaf workers open unique Origin PRs, check builds, merge."
+        : "No ANTHROPIC_API_KEY yet. Same recursive split, deterministic planner. Paste the key and rerun.",
+    });
+  }
+
+  const label = mode.agent ? "recursive agent" : "throttle";
   if (live) {
     process.stdout.write(
-      `LIVE throttle (${forgeRepo.forge} ${forgeRepo.slug}): max=${maxPrsPerRun} rate=${rate}/s concurrency=${concurrency} (safe default max is ${LIVE_DEFAULT_MAX} unless --max is set)\n`,
+      `LIVE ${label} (${forgeRepo.forge} ${forgeRepo.slug}): planner=${planner} max=${target.maxPrs} rate=${target.ratePerSec}/s concurrency=${target.concurrency} window=${target.window}\n`,
     );
   } else {
-    process.stdout.write(`dry-run throttle: max=${maxPrsPerRun} rate=${rate}/s concurrency=${concurrency}\n`);
+    process.stdout.write(
+      `dry-run ${label}: planner=${planner} max=${target.maxPrs} rate=${target.ratePerSec}/s concurrency=${target.concurrency}\n`,
+    );
   }
 
   const result = await runThrottleLoop({
@@ -232,10 +268,11 @@ async function commandThrottle(args: CliArgs): Promise<number> {
     adapter,
     clock,
     policy,
-    maxPrsPerRun,
+    maxPrsPerRun: target.maxPrs,
     maxEpisodes,
     maxDepth: intFlag(args, "max-depth", 3),
     live,
+    claude,
   });
   const report = {
     adapter: adapter.kind,
@@ -310,16 +347,28 @@ function requiredFlag(args: CliArgs, name: string): string | undefined {
   return args.flags.get(name);
 }
 
+function claudeFromArgs(args: CliArgs) {
+  const key = args.flags.get("api-key") ?? readClaudeApiKey();
+  if (args.switches.has("claude") && !key) {
+    throw new PlanValidationError("set ANTHROPIC_API_KEY or pass --api-key");
+  }
+  if (!key) return null;
+  return createClaudeClient(key);
+}
+
 function printHelp(): void {
-  process.stdout.write(`alpha-orch — bounded planner → worker → verifier harness
+  process.stdout.write(`alpha-orch — recursive planner → worker → verifier agent
 
 Usage:
   npx tsx src/cli.ts run --goal "<goal>" [--workspace .alpha/my-goal]
       [--max-depth 3] [--max-concurrency 3] [--max-respawns 2]
-      [--adapter local|files]
+      [--adapter local|files] [--claude]
   npx tsx src/cli.ts plan --goal "<goal>" --workspace .alpha/my-goal
   npx tsx src/cli.ts tree --workspace .alpha/my-goal
   npx tsx src/cli.ts smoke
+  npx tsx src/cli.ts agent [--live] [--per-minute 500] [--max 500]
+      [--concurrency 16] [--forge origin]
+      [--repo allocations/Alpha-throttle-test]
   npx tsx src/cli.ts throttle [--workspace .alpha/throttle]
       [--rate 2] [--max 8] [--concurrency 2] [--episodes 3]
       [--throttle-after 0]
@@ -330,9 +379,18 @@ Usage:
   npx tsx src/cli.ts throttle --live --max 3 --rate 1 --forge origin
       [--repo allocations/Alpha-throttle-test] [--no-merge]
 
+Recursive agent (Origin throttle test):
+  export ANTHROPIC_API_KEY=sk-...
+  npx tsx src/cli.ts agent --live --per-minute 500 --forge origin \\
+      --repo allocations/Alpha-throttle-test
+
+Claude is optional. Without a key the same tree still splits; with a key
+Claude is the planner. Each leaf opens one unique-file PR, checks the
+build, then merges. 500/sec is not possible over Origin HTTP. 500/min is
+the live target.
+
 Throttle defaults are SAFE (dry-run). --live opens real Origin changes
-(--forge origin, default) and caps --max at 3 unless you pass --max.
-  npx tsx src/cli.ts throttle --live --rate 1000 --max 50 --concurrency 10 --forge origin
+and caps --max at 3 unless you pass --max or --per-minute.
 
 Adapters:
   local   run the leaf runner against isolated node directories (default; used by smoke)

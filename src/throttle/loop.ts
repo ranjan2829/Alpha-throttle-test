@@ -1,10 +1,12 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import type { ClaudeClient } from "../claude.ts";
+import { deterministicBurstSplit, planBurstSplit } from "../claude.ts";
 import type { Handoff, Plan, PlanTask } from "../types.ts";
 import { DEFAULT_BOUNDS } from "../types.ts";
 import type { PrAdapter } from "./adapter.ts";
-import { learn, plannedBurst, shouldSplitBurst, summarizeOutcomes } from "./policy.ts";
+import { learn, plannedBurst, summarizeOutcomes } from "./policy.ts";
 import {
   appendEpisode,
   ensureThrottleWorkspace,
@@ -34,6 +36,7 @@ export interface ThrottleRunOptions {
   maxEpisodes: number;
   maxDepth: number;
   live: boolean;
+  claude?: ClaudeClient | null;
 }
 
 export interface ThrottleRunResult {
@@ -74,6 +77,7 @@ export async function runThrottleLoop(options: ThrottleRunOptions): Promise<Thro
       depth: 0,
       maxDepth: options.maxDepth,
       paths,
+      claude: options.claude ?? null,
     });
     const stats = summarizeOutcomes(outcomes);
     const next = learn(policy, stats, clock.now());
@@ -123,16 +127,22 @@ async function runBurst(args: {
   depth: number;
   maxDepth: number;
   paths: ThrottlePaths;
+  claude: ClaudeClient | null;
 }): Promise<TicketOutcome[]> {
-  if (shouldSplitBurst(args.tickets.length, args.depth, args.maxDepth)) {
-    const mid = Math.ceil(args.tickets.length / 2);
-    const left = args.tickets.slice(0, mid);
-    const right = args.tickets.slice(mid);
-    const [a, b] = await Promise.all([
-      runBurst({ ...args, tickets: left, depth: args.depth + 1 }),
-      runBurst({ ...args, tickets: right, depth: args.depth + 1 }),
-    ]);
-    return [...a, ...b];
+  const split = args.claude
+    ? await planBurstSplit({
+        claude: args.claude,
+        ticketCount: args.tickets.length,
+        depth: args.depth,
+        maxDepth: args.maxDepth,
+      })
+    : deterministicBurstSplit(args.tickets.length, args.depth, args.maxDepth);
+  if (split.kind === "parts") {
+    const slices = sliceTickets(args.tickets, split.parts);
+    const childOutcomes = await Promise.all(
+      slices.map((slice) => runBurst({ ...args, tickets: slice, depth: args.depth + 1 })),
+    );
+    return childOutcomes.flat();
   }
 
   const outcomes: TicketOutcome[] = [];
@@ -234,4 +244,14 @@ function burstPlan(tickets: TicketSpec[], policy: RatePolicy): Plan {
 
 export function defaultPolicy(): RatePolicy {
   return { ...SAFE_POLICY };
+}
+
+export function sliceTickets<T>(items: T[], parts: number[]): T[][] {
+  const slices: T[][] = [];
+  let cursor = 0;
+  for (const size of parts) {
+    slices.push(items.slice(cursor, cursor + size));
+    cursor += size;
+  }
+  return slices.filter((slice) => slice.length > 0);
 }

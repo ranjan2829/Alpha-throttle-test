@@ -36,6 +36,7 @@ export interface TicketOutcome {
   ticketId: string;
   seq: number;
   branch: string;
+  path: string;
   status: TicketStatus;
   prNumber: number | null;
   prUrl: string | null;

@@ -6,6 +6,34 @@ Cursor origin · Alpha throttle test · **Make a recursive agent on cursor origi
 
 This repo is that agent. GitHub is `ranjan2829/Alpha-throttle-test`. Origin is the personal account `ranjan-rgb/Alpha-throttle-test` — not the allocations org. The Origin copy is created by `origin-setup` after login.
 
+## How the recursive AI agent works (plain)
+
+One planner owns the goal. If the work is still big, it splits and **calls itself** on each half (depth + 1). That is the recursion. Leaves are workers. Each worker opens **one** Origin PR, checks the build, then merges.
+
+```
+You: "open 500 isolated PRs, check, merge"
+        │
+        ▼
+   planner (Claude if ANTHROPIC_API_KEY is set)
+        │
+        ├── planner (depth 1)  tickets 1–250
+        │     └── workers: unique file each → PR → checks → merge
+        └── planner (depth 1)  tickets 251–500
+              └── workers
+```
+
+No shared files. Every ticket is `tickets/<run>/<seq>.md` on a **frozen** `main` SHA, so PRs are siblings, not a stack. Origin stack parents are cleared. Merges replay onto latest `main` if Origin races.
+
+500 PRs **a second** is not possible over Origin HTTP (round-trips). 500 PRs **a minute** (~8.3/s) is the live target.
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+npx tsx src/cli.ts agent --live --per-minute 500 --concurrency 16 \
+  --forge origin --repo allocations/Alpha-throttle-test
+```
+
+Without a key the same tree still runs; the planner is deterministic. Paste the key and Claude becomes the planner.
+
 A root planner owns a user goal, writes `plan.json`, and a script runs the spawn → wait → handoff loop. Workers and verifiers never talk to each other. They report up through JSON handoffs on disk. The loop stops when the goal is met or a hard depth / concurrency / respawn cap is hit.
 
 This is an `/orchestrate`-style **planner → worker → verifier** tree, not a single chat wrapper. Long-running agent transcripts drift; a script plus JSON state keeps its footing.

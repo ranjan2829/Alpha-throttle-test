@@ -68,6 +68,26 @@ test("plannedBurst never exceeds maxPrsPerRun or maxOpenPrs", () => {
   assert.equal(plannedBurst(policy({ currentRatePerSec: 1000, maxOpenPrs: 50 }), 8, 8), 0);
 });
 
+test("dry-run loop uses a Claude split then still writes dry-run outcomes", async () => {
+  const workspace = tmpWorkspace();
+  const clock = fakeClock();
+  const result = await runThrottleLoop({
+    workspace,
+    adapter: createDryRunAdapter({ clock, throttleAfter: 0, latencyMs: 0 }),
+    clock,
+    policy: policy({ currentRatePerSec: 8, maxPrsPerRun: 8, concurrency: 2, maxOpenPrs: 8 }),
+    maxPrsPerRun: 8,
+    maxEpisodes: 1,
+    maxDepth: 3,
+    live: false,
+    claude: {
+      complete: async () => '{"kind":"parts","parts":[5,3]}',
+    },
+  });
+  assert.equal(result.outcomes.length, 8);
+  assert.ok(result.outcomes.every((item) => item.status === "dry-run"));
+});
+
 test("dry-run loop does not open GitHub PRs and writes rates.json", async () => {
   const workspace = tmpWorkspace();
   const clock = fakeClock();
@@ -134,6 +154,7 @@ function outcome(partial: Partial<TicketOutcome>): TicketOutcome {
     ticketId: "t",
     seq: 1,
     branch: "cursor/throttle-t-ec34",
+    path: "tickets/t/0001.md",
     status: "dry-run",
     prNumber: null,
     prUrl: null,
@@ -150,6 +171,7 @@ function outcome(partial: Partial<TicketOutcome>): TicketOutcome {
 test("isMergeRace detects Origin main-ref collisions", () => {
   assert.equal(isMergeRace("ref updates rejected by git at prepare: refs/heads/main"), true);
   assert.equal(isMergeRace("updated by another push in the same batch"), true);
+  assert.equal(isMergeRace("stack head conflicts with main"), true);
   assert.equal(isMergeRace("build failed"), false);
 });
 
