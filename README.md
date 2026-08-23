@@ -6,16 +6,18 @@ Recursive agent on Cursor Origin. Repo: `ranjan2829/Alpha-throttle-test`.
 
 ## Stats
 
-Live Origin run · 23 Aug 2026 · target **10 000** merged · still going
+Live Origin run · 23 Aug 2026 · **stopped** · target was 10 000
 
 | tried | PRs opened | merged | errors | 429s | time |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 7 600 | 7 290 | **7 336** | 310 | **0** | 51 min |
+| 8 800 | 8 418 | **8 460** | 382 | **0** | 57 min |
 
 | speed | per second | per minute |
 | --- | ---: | ---: |
-| PRs opened | **2.40** | **144** |
-| merged | **2.41** | **145** |
+| PRs opened | **2.45** | **147** |
+| merged | **2.46** | **148** |
+
+Latest merged PR: [#10088](https://cursor.com/codebase/allocations/Alpha-throttle-test/pull/10088)
 
 Author: Ranjan S `<ranjan@allocations.com>`
 
