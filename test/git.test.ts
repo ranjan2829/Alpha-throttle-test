@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { writeUniqueCommit } from "../src/throttle/git.ts";
+import { resolveGitIdentity, writeUniqueCommit } from "../src/throttle/git.ts";
 
 function initRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), "alpha-git-"));
@@ -18,6 +18,34 @@ function initRepo(): string {
   execFileSync("git", ["commit", "-m", "base"], { cwd: dir });
   return dir;
 }
+
+test("resolveGitIdentity defaults to ranjan@allocations.com", () => {
+  assert.deepEqual(resolveGitIdentity({}), {
+    name: "Ranjan S",
+    email: "ranjan@allocations.com",
+  });
+  assert.deepEqual(
+    resolveGitIdentity({ ALPHA_GIT_NAME: "Other", ALPHA_GIT_EMAIL: "other@example.com" }),
+    { name: "Other", email: "other@example.com" },
+  );
+});
+
+test("writeUniqueCommit stamps the allocations email", async () => {
+  const repo = initRepo();
+  const parent = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();
+  const commit = await writeUniqueCommit({
+    repoDir: repo,
+    parentSha: parent,
+    path: "tickets/run/email.md",
+    body: "email\n",
+    message: "email",
+  });
+  const author = execFileSync("git", ["log", "-1", "--format=%an <%ae>", commit], {
+    cwd: repo,
+    encoding: "utf8",
+  }).trim();
+  assert.equal(author, "Ranjan S <ranjan@allocations.com>");
+});
 
 test("writeUniqueCommit is safe under concurrency", async () => {
   const repo = initRepo();

@@ -134,6 +134,8 @@ npx tsx src/cli.ts agent --live --until-merged 10000 --chunk 200 --concurrency 1
 
 Copy `.env.example` to `.env`. Never commit the key.
 
+Ticket commits and Origin squash merges are stamped **Ranjan S `<ranjan@allocations.com>`**. Override with `ALPHA_GIT_NAME` / `ALPHA_GIT_EMAIL`. PR author is whoever is logged into `origin auth` (same account).
+
 `--live` without `--max` / `--per-minute` caps at 3 PRs.
 
 ### Goal harness

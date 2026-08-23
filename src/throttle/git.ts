@@ -180,14 +180,18 @@ async function hashBlob(repoDir: string, body: string): Promise<string> {
   });
 }
 
-async function gitIdentity(repoDir: string): Promise<{ name: string; email: string }> {
-  try {
-    const name = await gitText(repoDir, ["config", "user.name"]);
-    const email = await gitText(repoDir, ["config", "user.email"]);
-    if (name && email) return { name, email };
-  } catch {
-    // fall through
-  }
-  return { name: "alpha-throttle", email: "alpha-throttle@local" };
+export const DEFAULT_COMMIT_NAME = "Ranjan S";
+export const DEFAULT_COMMIT_EMAIL = "ranjan@allocations.com";
+
+export function resolveGitIdentity(
+  env: NodeJS.ProcessEnv = process.env,
+): { name: string; email: string } {
+  const name = env.ALPHA_GIT_NAME?.trim() || DEFAULT_COMMIT_NAME;
+  const email = env.ALPHA_GIT_EMAIL?.trim() || DEFAULT_COMMIT_EMAIL;
+  return { name, email };
+}
+
+async function gitIdentity(_repoDir: string): Promise<{ name: string; email: string }> {
+  return resolveGitIdentity();
 }
 
