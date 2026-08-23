@@ -2,18 +2,18 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { floatFlag, intFlag, parseArgs, type CliArgs } from "./args.ts";
 import { PlanValidationError } from "./errors.ts";
 import { renderTree, runOrchestrator } from "./orchestrator.ts";
 import { decomposeGoal } from "./planner.ts";
 import { ensureWorkspace, loadPlan, loadState, savePlan, workspacePaths } from "./store.ts";
+import { createDryRunAdapter, createLiveAdapter, systemClock } from "./throttle/adapter.ts";
+import { DEFAULT_GITHUB_MIRROR, DEFAULT_ORIGIN_REPO, parseForgeFlag, parseRepoSlug } from "./throttle/forge.ts";
+import { runOriginHost } from "./throttle/host.ts";
+import { runThrottleLoop } from "./throttle/loop.ts";
+import { addCursorOriginRemote, originAuthStatus, originSetupText } from "./throttle/origin-cli.ts";
+import { LIVE_DEFAULT_MAX, SAFE_POLICY } from "./throttle/types.ts";
 import { DEFAULT_BOUNDS, type AdapterKind, type Bounds } from "./types.ts";
-
-interface CliArgs {
-  command: string;
-  positionals: string[];
-  flags: Map<string, string>;
-  switches: Set<string>;
-}
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const args = parseArgs(argv);
@@ -28,6 +28,10 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return commandTree(args);
     case "smoke":
       return commandSmoke(args);
+    case "throttle":
+      return commandThrottle(args);
+    case "origin-setup":
+      return commandOriginSetup(args);
     case "help":
     case "--help":
     case "-h":
@@ -160,6 +164,114 @@ async function commandSmoke(args: CliArgs): Promise<number> {
   return 0;
 }
 
+async function commandThrottle(args: CliArgs): Promise<number> {
+  const live = args.switches.has("live");
+  const workspace = args.flags.get("workspace") ?? join(process.cwd(), ".alpha", "throttle");
+  const maxDefault = live ? LIVE_DEFAULT_MAX : SAFE_POLICY.maxPrsPerRun;
+  const maxPrsPerRun = args.flags.has("max") ? intFlag(args, "max", maxDefault) : maxDefault;
+  const rate = args.flags.has("rate")
+    ? floatFlag(args, "rate", SAFE_POLICY.currentRatePerSec)
+    : SAFE_POLICY.currentRatePerSec;
+  const concurrency = args.flags.has("concurrency")
+    ? intFlag(args, "concurrency", SAFE_POLICY.concurrency)
+    : SAFE_POLICY.concurrency;
+  const maxEpisodes = args.flags.has("episodes")
+    ? intFlag(args, "episodes", live ? 1 : 3)
+    : live
+      ? 1
+      : 3;
+  const clock = systemClock();
+  const policy = {
+    ...SAFE_POLICY,
+    currentRatePerSec: rate,
+    concurrency,
+    maxPrsPerRun,
+    lastUpdated: clock.now(),
+    reason: live ? "cli --live" : "cli dry-run",
+  };
+  const forge = parseForgeFlag(args.flags.get("forge"));
+  const repoFlag = args.flags.get("repo") ?? process.env.ALPHA_THROTTLE_REPO ?? DEFAULT_ORIGIN_REPO;
+  const forgeRepo = parseRepoSlug(repoFlag, forge);
+  if (live && forgeRepo.forge === "origin") {
+    addCursorOriginRemote(process.cwd(), forgeRepo);
+    const auth = originAuthStatus();
+    if (!auth.ok) {
+      process.stderr.write(`${auth.detail}\n\n${originSetupText(forgeRepo.slug)}`);
+      return 2;
+    }
+  }
+  const adapter = live
+    ? createLiveAdapter({
+        clock,
+        repoDir: process.cwd(),
+        forgeRepo,
+        baseBranch: args.flags.get("base") ?? "main",
+      })
+    : createDryRunAdapter({
+        clock,
+        throttleAfter: intFlag(args, "throttle-after", 0),
+        latencyMs: intFlag(args, "latency-ms", 0),
+      });
+
+  if (live) {
+    process.stdout.write(
+      `LIVE throttle (${forgeRepo.forge} ${forgeRepo.slug}): max=${maxPrsPerRun} rate=${rate}/s concurrency=${concurrency} (safe default max is ${LIVE_DEFAULT_MAX} unless --max is set)\n`,
+    );
+  } else {
+    process.stdout.write(`dry-run throttle: max=${maxPrsPerRun} rate=${rate}/s concurrency=${concurrency}\n`);
+  }
+
+  const result = await runThrottleLoop({
+    workspace,
+    adapter,
+    clock,
+    policy,
+    maxPrsPerRun,
+    maxEpisodes,
+    maxDepth: intFlag(args, "max-depth", 3),
+    live,
+  });
+  const report = {
+    adapter: adapter.kind,
+    forge: live ? forgeRepo : { forge: "dry-run", slug: forgeRepo.slug },
+    openedOrDry: result.openedOrDry,
+    episodes: result.episodes.map((episode) => ({
+      id: episode.id,
+      burst: episode.plannedBurst,
+      stats: episode.stats,
+      rateBefore: episode.policyBefore.currentRatePerSec,
+      rateAfter: episode.policyAfter.currentRatePerSec,
+      reason: episode.policyAfter.reason,
+    })),
+    policy: result.policy,
+    outcomes: result.outcomes.map((item) => ({
+      ticketId: item.ticketId,
+      status: item.status,
+      httpStatus: item.httpStatus,
+      prUrl: item.prUrl,
+      latencyMs: item.latencyMs,
+    })),
+  };
+  writeFileSync(join(workspace, "throttle-report.json"), `${JSON.stringify(report, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  process.stdout.write(`workspace: ${workspace}\n`);
+  return 0;
+}
+
+function commandOriginSetup(args: CliArgs): number {
+  const originSlug = args.flags.get("repo") ?? DEFAULT_ORIGIN_REPO;
+  const githubSlug = args.flags.get("github") ?? DEFAULT_GITHUB_MIRROR;
+  const push = !args.switches.has("no-push");
+  const result = runOriginHost({
+    repoDir: process.cwd(),
+    originSlug,
+    githubSlug,
+    push,
+  });
+  process.stdout.write(result.text);
+  return result.ok ? 0 : 2;
+}
+
 function boundsFromArgs(args: CliArgs): Bounds {
   return {
     maxDepth: intFlag(args, "max-depth", DEFAULT_BOUNDS.maxDepth),
@@ -173,42 +285,8 @@ function defaultWorkspace(goal: string): string {
   return join(process.cwd(), ".alpha", slug);
 }
 
-function intFlag(args: CliArgs, name: string, fallback: number): number {
-  const raw = args.flags.get(name);
-  if (raw === undefined) return fallback;
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 0) {
-    throw new PlanValidationError(`--${name} must be a non-negative integer`);
-  }
-  return value;
-}
-
 function requiredFlag(args: CliArgs, name: string): string | undefined {
   return args.flags.get(name);
-}
-
-function parseArgs(argv: string[]): CliArgs {
-  const [command = "", ...rest] = argv;
-  const flags = new Map<string, string>();
-  const switches = new Set<string>();
-  const positionals: string[] = [];
-  for (let i = 0; i < rest.length; i += 1) {
-    const token = rest[i];
-    if (!token) continue;
-    if (token.startsWith("--")) {
-      const key = token.slice(2);
-      const next = rest[i + 1];
-      if (next === undefined || next.startsWith("--")) {
-        switches.add(key);
-      } else {
-        flags.set(key, next);
-        i += 1;
-      }
-    } else {
-      positionals.push(token);
-    }
-  }
-  return { command, positionals, flags, switches };
 }
 
 function printHelp(): void {
@@ -221,10 +299,23 @@ Usage:
   npx tsx src/cli.ts plan --goal "<goal>" --workspace .alpha/my-goal
   npx tsx src/cli.ts tree --workspace .alpha/my-goal
   npx tsx src/cli.ts smoke
+  npx tsx src/cli.ts throttle [--workspace .alpha/throttle]
+      [--rate 2] [--max 8] [--concurrency 2] [--episodes 3]
+      [--throttle-after 0]
+  npx tsx src/cli.ts origin-setup [--repo allocations/Alpha-throttle-test]
+      [--github ranjan2829/Alpha-throttle-test] [--no-push]
+  npx tsx src/cli.ts throttle --live --max 3 --rate 1 --forge origin
+      [--repo allocations/Alpha-throttle-test]
+
+Throttle defaults are SAFE (dry-run). --live opens real Origin changes
+(--forge origin, default) and caps --max at 3 unless you pass --max.
+  npx tsx src/cli.ts throttle --live --rate 1000 --max 50 --concurrency 10 --forge origin
 
 Adapters:
   local   run the leaf runner against isolated node directories (default; used by smoke)
   files   write node briefs and wait for each child to write handoff.json
+  dry-run throttle adapter (default) never opens PRs
+  live    throttle adapter requires --live
 `);
 }
 
