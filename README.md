@@ -2,6 +2,10 @@
 
 Bounded recursive-agent harness for **Cursor Origin / cloud agents**.
 
+Kingsley Advani (22 Aug 2026): Cursor origin · Alpha throttle test · **Make a recursive agent on cursor origin**.
+
+This repo is that agent. GitHub (`ranjan2829/Alpha-throttle-test`) is the working copy. Origin (`allocations/Alpha-throttle-test`) is the host. `origin-setup` mirrors the GitHub tree onto Origin once you are logged in.
+
 A root planner owns a user goal, writes `plan.json`, and a script runs the spawn → wait → handoff loop. Workers and verifiers never talk to each other. They report up through JSON handoffs on disk. The loop stops when the goal is met or a hard depth / concurrency / respawn cap is hit.
 
 This is an `/orchestrate`-style **planner → worker → verifier** tree, not a single chat wrapper. Long-running agent transcripts drift; a script plus JSON state keeps its footing.
@@ -99,14 +103,23 @@ Workspace layout after a run:
 
 ## Origin CLI
 
-This repo lives on Origin as `allocations/Alpha-throttle-test`. Cloud / Origin agents clone and push here, not through a chat wrapper.
+Host the recursive agent on Origin as `allocations/Alpha-throttle-test`. Cloud / Origin agents clone and push there, not through a chat wrapper.
+
+```bash
+npx tsx src/cli.ts origin-setup
+```
+
+That prints Kingsley's brief and the official Origin flow, adds remote `cursor-origin`, and — when `origin auth login` has been run — mirrors GitHub and pushes `HEAD`:
 
 ```bash
 curl -fsSL https://downloads.cursor.com/origin/install.sh | sh
 origin auth login
+origin repo create-mirrored 'ranjan2829/Alpha-throttle-test' --namespace allocations
+origin auth setup-git --local
+git push -u cursor-origin HEAD
 ```
 
-Clone an existing repo:
+Clone an existing Origin repo:
 
 ```bash
 origin repo clone 'allocations/Alpha-throttle-test'
@@ -114,24 +127,9 @@ origin repo clone 'allocations/Alpha-throttle-test'
 git clone 'https://origin.cursor.com/allocations/Alpha-throttle-test'
 ```
 
-Push a local project:
+If GitHub is already `origin`, keep it. The harness uses `cursor-origin` for Origin so ManagePullRequest / `gh` stay on GitHub.
 
-```bash
-git init -b 'main'
-git remote add origin 'https://origin.cursor.com/allocations/Alpha-throttle-test'
-git add .
-git commit -m "Initial commit"
-git push -u origin 'main'
-```
-
-If GitHub is already `origin`, add Origin as a second remote (the live adapter does this as `cursor-origin`):
-
-```bash
-git remote add cursor-origin 'https://origin.cursor.com/allocations/Alpha-throttle-test'
-origin auth setup-git --local
-```
-
-Live throttle uses `origin pr create` by default (`--forge origin`). `--forge github` is the fallback.
+Live throttle uses `origin pr create` by default (`--forge origin`). `--forge github` is the fallback. `--live` exits `2` until Origin login succeeds.
 
 ## Origin / cloud-agent usage
 

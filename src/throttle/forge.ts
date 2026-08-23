@@ -1,6 +1,7 @@
 export type ForgeKind = "origin" | "github";
 
 export const DEFAULT_ORIGIN_REPO = "allocations/Alpha-throttle-test";
+export const DEFAULT_GITHUB_MIRROR = "ranjan2829/Alpha-throttle-test";
 export const ORIGIN_GIT_HOST = "https://origin.cursor.com";
 export const ORIGIN_REMOTE = "cursor-origin";
 

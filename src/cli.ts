@@ -8,7 +8,8 @@ import { renderTree, runOrchestrator } from "./orchestrator.ts";
 import { decomposeGoal } from "./planner.ts";
 import { ensureWorkspace, loadPlan, loadState, savePlan, workspacePaths } from "./store.ts";
 import { createDryRunAdapter, createLiveAdapter, systemClock } from "./throttle/adapter.ts";
-import { DEFAULT_ORIGIN_REPO, parseForgeFlag, parseRepoSlug } from "./throttle/forge.ts";
+import { DEFAULT_GITHUB_MIRROR, DEFAULT_ORIGIN_REPO, parseForgeFlag, parseRepoSlug } from "./throttle/forge.ts";
+import { runOriginHost } from "./throttle/host.ts";
 import { runThrottleLoop } from "./throttle/loop.ts";
 import { addCursorOriginRemote, originAuthStatus, originSetupText } from "./throttle/origin-cli.ts";
 import { LIVE_DEFAULT_MAX, SAFE_POLICY } from "./throttle/types.ts";
@@ -30,7 +31,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     case "throttle":
       return commandThrottle(args);
     case "origin-setup":
-      return commandOriginSetup();
+      return commandOriginSetup(args);
     case "help":
     case "--help":
     case "-h":
@@ -257,14 +258,18 @@ async function commandThrottle(args: CliArgs): Promise<number> {
   return 0;
 }
 
-function commandOriginSetup(): number {
-  const forgeRepo = parseRepoSlug(DEFAULT_ORIGIN_REPO, "origin");
-  const remote = addCursorOriginRemote(process.cwd(), forgeRepo);
-  const auth = originAuthStatus();
-  process.stdout.write(originSetupText(forgeRepo.slug));
-  process.stdout.write(`\n${remote}\n`);
-  process.stdout.write(`auth: ${auth.ok ? "ok" : "needed"} ${auth.detail}\n`);
-  return auth.ok ? 0 : 2;
+function commandOriginSetup(args: CliArgs): number {
+  const originSlug = args.flags.get("repo") ?? DEFAULT_ORIGIN_REPO;
+  const githubSlug = args.flags.get("github") ?? DEFAULT_GITHUB_MIRROR;
+  const push = !args.switches.has("no-push");
+  const result = runOriginHost({
+    repoDir: process.cwd(),
+    originSlug,
+    githubSlug,
+    push,
+  });
+  process.stdout.write(result.text);
+  return result.ok ? 0 : 2;
 }
 
 function boundsFromArgs(args: CliArgs): Bounds {
@@ -297,7 +302,8 @@ Usage:
   npx tsx src/cli.ts throttle [--workspace .alpha/throttle]
       [--rate 2] [--max 8] [--concurrency 2] [--episodes 3]
       [--throttle-after 0]
-  npx tsx src/cli.ts origin-setup
+  npx tsx src/cli.ts origin-setup [--repo allocations/Alpha-throttle-test]
+      [--github ranjan2829/Alpha-throttle-test] [--no-push]
   npx tsx src/cli.ts throttle --live --max 3 --rate 1 --forge origin
       [--repo allocations/Alpha-throttle-test]
 

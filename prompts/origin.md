@@ -1,13 +1,24 @@
 You are running this harness on Cursor Origin.
 
-Install and login (human, once):
+Kingsley Advani (22 Aug 2026): Cursor origin · Alpha throttle test · make a recursive agent on cursor origin.
+
+Install and login (human, once), then host this tree:
 
 ```
 curl -fsSL https://downloads.cursor.com/origin/install.sh | sh
 origin auth login
+npx tsx src/cli.ts origin-setup
 ```
 
-Clone:
+`origin-setup` mirrors GitHub onto Origin when you are logged in:
+
+```
+origin repo create-mirrored 'ranjan2829/Alpha-throttle-test' --namespace allocations
+origin auth setup-git --local
+git push -u cursor-origin HEAD
+```
+
+Clone if the Origin repo already exists:
 
 ```
 origin repo clone 'allocations/Alpha-throttle-test'
@@ -15,22 +26,7 @@ origin repo clone 'allocations/Alpha-throttle-test'
 git clone 'https://origin.cursor.com/allocations/Alpha-throttle-test'
 ```
 
-Push a local tree:
-
-```
-git init -b 'main'
-git remote add origin 'https://origin.cursor.com/allocations/Alpha-throttle-test'
-git add .
-git commit -m "Initial commit"
-git push -u origin 'main'
-```
-
-If this workspace already has a GitHub `origin` remote, add Origin beside it:
-
-```
-git remote add cursor-origin 'https://origin.cursor.com/allocations/Alpha-throttle-test'
-origin auth setup-git --local
-```
+If this workspace already has a GitHub `origin` remote, keep it. Origin is `cursor-origin`.
 
 Live throttle (default forge is Origin):
 
