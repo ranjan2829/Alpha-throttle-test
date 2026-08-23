@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { classifyLiveFailure, createDryRunAdapter, summarizeChecks } from "../src/throttle/adapter.ts";
+import { classifyLiveFailure, createDryRunAdapter, isMergeRace, summarizeChecks } from "../src/throttle/adapter.ts";
 import { runThrottleLoop } from "../src/throttle/loop.ts";
 import { learn, plannedBurst, shouldSplitBurst, summarizeOutcomes } from "../src/throttle/policy.ts";
 import { SAFE_POLICY, type Clock, type RatePolicy, type TicketOutcome } from "../src/throttle/types.ts";
@@ -146,6 +146,12 @@ function outcome(partial: Partial<TicketOutcome>): TicketOutcome {
     ...partial,
   };
 }
+
+test("isMergeRace detects Origin main-ref collisions", () => {
+  assert.equal(isMergeRace("ref updates rejected by git at prepare: refs/heads/main"), true);
+  assert.equal(isMergeRace("updated by another push in the same batch"), true);
+  assert.equal(isMergeRace("build failed"), false);
+});
 
 test("summarizeChecks treats empty as none and failures as failure", () => {
   assert.deepEqual(summarizeChecks([]), { checkStatus: "none", checkCount: 0 });

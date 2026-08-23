@@ -343,16 +343,44 @@ async function readChecks(
   }
 }
 
+export function isMergeRace(message: string): boolean {
+  return /ref updates rejected|updated by another push|stack head conflicts with main/i.test(message);
+}
+
+export async function mergeOriginPr(repoDir: string, repo: string, target: string): Promise<void> {
+  await runWithMergeRetry(repoDir, ["origin", "pr", "merge", target, "-R", repo, "--squash"]);
+}
+
 async function mergeChange(repoDir: string, forgeRepo: ForgeRepo, outcome: TicketOutcome): Promise<void> {
   const target = outcome.prNumber ? String(outcome.prNumber) : outcome.branch;
-  if (forgeRepo.forge === "origin") {
-    await run(repoDir, ["origin", "pr", "merge", target, "-R", forgeRepo.slug, "--squash"]);
-    return;
-  }
-  if (!outcome.prNumber) {
+  const argv =
+    forgeRepo.forge === "origin"
+      ? ["origin", "pr", "merge", target, "-R", forgeRepo.slug, "--squash"]
+      : outcome.prNumber
+        ? ["gh", "pr", "merge", String(outcome.prNumber), "--squash"]
+        : null;
+  if (!argv) {
     throw new Error("cannot merge GitHub PR without a number");
   }
-  await run(repoDir, ["gh", "pr", "merge", String(outcome.prNumber), "--squash"]);
+  await runWithMergeRetry(repoDir, argv);
+}
+
+async function runWithMergeRetry(cwd: string, argv: string[]): Promise<ProcResult> {
+  let lastError = "merge failed";
+  for (let attempt = 1; attempt <= 8; attempt += 1) {
+    try {
+      return await run(cwd, argv);
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : "merge failed";
+      if (!isMergeRace(lastError) || attempt === 8) {
+        throw err;
+      }
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 150 * attempt);
+      });
+    }
+  }
+  throw new Error(lastError);
 }
 
 interface ObservedChange {

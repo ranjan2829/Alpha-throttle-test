@@ -1,4 +1,4 @@
-import { parseCheckRows, summarizeChecks } from "./adapter.ts";
+import { mergeOriginPr, parseCheckRows, summarizeChecks } from "./adapter.ts";
 import type { CheckStatus } from "./types.ts";
 import { spawn } from "node:child_process";
 
@@ -47,7 +47,7 @@ export async function finishOpenOriginChanges(options: {
     "--json",
     "number,title,status",
   ]);
-  const changes = parseListed(listed);
+  const changes = parseListed(listed).filter((change) => /throttle ticket/i.test(change.title));
   const rows: FinishRow[] = [];
   const pending = [...changes];
   const running = new Map<number, Promise<void>>();
@@ -109,7 +109,7 @@ async function finishOne(repoDir: string, repo: string, change: ListedChange): P
         error: "build failed",
       };
     }
-    await runText(repoDir, ["origin", "pr", "merge", String(change.number), "-R", repo, "--squash"]);
+    await mergeOriginPr(repoDir, repo, String(change.number));
     return {
       number: change.number,
       title: change.title,
