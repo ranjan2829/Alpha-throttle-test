@@ -1,25 +1,20 @@
 # Alpha-throttle-test
 
-Cursor Origin recursive agent. GitHub `ranjan2829/Alpha-throttle-test`. Origin host: `ranjan-rgb/Alpha-throttle-test`.
+Recursive agent on Cursor Origin. Repo: `ranjan2829/Alpha-throttle-test`.
 
 ---
 
 ## Stats
 
-23 Aug 2026 · Origin · CI none · 429s **0**
+Live Origin run · 23 Aug 2026 · still going · target **100 000** merged
 
-| | attempted | opened | merged | errors | wall |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| **Proof** | 8 | 8 | **8** | **0** | 8.1 s |
-| **Clean volume** | 1 200 | 1 200 | **1 019** | **0** | 9.6 min |
-| **Live** | 5 200 | | **4 920 / 100 000** | | running |
+| tried | opened | merged | errors | 429s | time | merged / min |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 6 000 | 5 770 | **5 681** | 230 | **0** | 38 min | **148** |
 
-| clean volume | / min |
-| --- | ---: |
-| open | **124.5** |
-| merge | **105.7** |
+Latest merged PR: [#6964](https://cursor.com/codebase/allocations/Alpha-throttle-test/pull/6964)
 
-Proof [#56](https://cursor.com/codebase/allocations/Alpha-throttle-test/pull/56)–[#63](https://cursor.com/codebase/allocations/Alpha-throttle-test/pull/63) · author Ranjan S `<ranjan@allocations.com>` · merge-commit, not squash
+Author: Ranjan S `<ranjan@allocations.com>`
 
 ---
 
@@ -27,39 +22,23 @@ Proof [#56](https://cursor.com/codebase/allocations/Alpha-throttle-test/pull/56)
 
 ```mermaid
 flowchart TD
-  G[user goal] --> P[root planner]
-  P --> W1[worker]
-  P --> W2[worker]
-  P --> V[verifier]
-  P --> S[subplanner]
-  S -->|depth + 1| P2[same loop on a slice]
-  W1 --> H[handoff.json]
-  W2 --> H
-  V --> H
-  P2 --> H
-  V -->|reject| R[respawn worker]
-  R --> W1
-  V -->|accept| D[done]
+  G[goal] --> P[Claude planner]
+  P -->|split| P2[planner]
+  P -->|split| P3[planner]
+  P2 --> W1[worker]
+  P3 --> W2[worker]
+  W1 --> V[verifier]
+  W2 --> V
+  V -->|accept| D[merged]
+  V -->|reject| W1
 ```
 
 ```mermaid
 flowchart LR
-  W[leaf worker] --> F["tickets/run/seq.md"]
-  F --> PR[Origin PR]
-  PR --> M[merge-commit]
-  M --> L[learn]
-  L -->|merged under target| W
+  W[worker] --> F[one unique file]
+  F --> PR[open Origin PR]
+  PR --> M[merge]
+  M --> L{merged 100000?}
+  L -->|no| W
+  L -->|yes| S[stop]
 ```
-
-| node | loop? | scope | output |
-| --- | --- | --- | --- |
-| planner | yes | whole goal | `plan.json` |
-| subplanner | yes | one slice | handoff to parent |
-| worker | no | one task | `handoffs/<name>.json` |
-| verifier | no | one target | accept / reject |
-
-| bound | default |
-| --- | ---: |
-| maxDepth | 3 |
-| maxConcurrentChildren | 3 |
-| maxResawnsPerTask | 2 |
