@@ -23,59 +23,25 @@ Author: Ranjan S `<ranjan@allocations.com>`
 
 ---
 
-## Flow
+## How Claude works
 
-Same function, smaller slice, `depth + 1`. Stops at `maxDepth = 3`. Workers do not see siblings. Reject respawns that worker only.
-
-```
- user goal ──► ┌ depth 0 ┐ ──► ┌ depth 1 ┐ ──► ┌ depth 2 ┐ ──► ┌ depth 3 leaf ┐
-               │  Claude │     │  Claude │     │  Claude │     │  Claude      │
-               │    │    │     │    │    │     │    │    │     │    │         │
-               │ ┌──┼──┐ │     │ ┌──┼──┐ │     │ ┌──┼──┐ │     │ ┌──┼──┐      │
-               │ w  w  V │     │ w  w  V │     │ w  w  V │     │ w  w  V      │
-               │       │ │     │       │ │     │       │ │     │              │
-               │      sub┼────►│      sub┼────►│      sub┼────►│   stop       │
-               └─────────┘     └─────────┘     └─────────┘     └──────────────┘
-```
+Claude does **not** write the tickets or merge the PRs. It only cuts the burst.
 
 ```mermaid
-flowchart LR
-  G[user goal]
-
-  subgraph D0["depth 0"]
-    direction TB
-    P0[Claude]
-    P0 --> W0[worker]
-    P0 --> W0b[worker]
-    P0 --> V0[verifier]
-  end
-
-  subgraph D1["depth 1"]
-    direction TB
-    P1[Claude]
-    P1 --> W1[worker]
-    P1 --> W1b[worker]
-    P1 --> V1[verifier]
-  end
-
-  subgraph D2["depth 2"]
-    direction TB
-    P2[Claude]
-    P2 --> W2[worker]
-    P2 --> W2b[worker]
-    P2 --> V2[verifier]
-  end
-
-  subgraph D3["depth 3 · leaf"]
-    direction TB
-    P3[Claude]
-    P3 --> W3[worker]
-    P3 --> W3b[worker]
-    P3 --> V3[verifier]
-  end
-
-  G --> P0
-  P0 -->|depth + 1| P1
-  P1 -->|depth + 1| P2
-  P2 -->|depth + 1| P3
+flowchart TD
+  T[400 tickets] --> C[Claude Sonnet 5 Anthropic API]
+  C -->|JSON split 400 to 100 100 100 100| P1[planner depth 1]
+  C --> P2[planner depth 1]
+  C --> P3[planner depth 1]
+  C --> P4[planner depth 1]
+  P1 -->|Claude again 100 to 25 25 25 25| L1[leaf workers]
+  P2 --> L2[leaf workers]
+  P3 --> L3[leaf workers]
+  P4 --> L4[leaf workers]
+  L1 --> W[worker: unique file then open PR then merge]
+  L2 --> W
+  L3 --> W
+  L4 --> W
 ```
+
+At `maxDepth` Claude stops. Leaves are deterministic: one file, one Origin PR, merge-commit.
