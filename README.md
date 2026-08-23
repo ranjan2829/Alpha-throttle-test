@@ -25,29 +25,34 @@ Author: Ranjan S `<ranjan@allocations.com>`
 
 ## How Claude works
 
-Claude only splits the burst. Workers open and merge the PRs.
+Claude does **not** write the tickets or merge the PRs. It only cuts the burst.
 
 ```mermaid
 flowchart TD
-  tickets[400 tickets] --> claude[Claude Sonnet 5]
-  claude -->|split 100 100 100 100| p1[planner]
-  claude --> p2[planner]
-  claude --> p3[planner]
-  claude --> p4[planner]
-  p1 -->|split 25 25 25 25| leaf[leaf workers]
-  p2 --> leaf
-  p3 --> leaf
-  p4 --> leaf
-  leaf --> work[unique file then open PR then merge]
+  T[400 tickets] --> C[Claude Sonnet 5 Anthropic API]
+  C -->|JSON split 400 to 100 100 100 100| P1[planner depth 1]
+  C --> P2[planner depth 1]
+  C --> P3[planner depth 1]
+  C --> P4[planner depth 1]
+  P1 -->|Claude again 100 to 25 25 25 25| L1[leaf workers]
+  P2 --> L2[leaf workers]
+  P3 --> L3[leaf workers]
+  P4 --> L4[leaf workers]
+  L1 --> W[worker: unique file then open PR then merge]
+  L2 --> W
+  L3 --> W
+  L4 --> W
 ```
 
+At `maxDepth` Claude stops. Leaves are deterministic: one file, one Origin PR, merge-commit.
+
 ```mermaid
 flowchart TD
-  worker[worker] --> file[unique file]
-  file --> pr[open PR]
-  pr --> merge[merge]
-  merge --> done{hit 10000 merges?}
-  done -->|no| claude[Claude splits next chunk]
-  claude --> worker
-  done -->|yes| stop[stop]
+  W[worker] --> F[tickets/run/seq.md]
+  F --> P[open PR]
+  P --> M[merge]
+  M --> Q{merged 10000?}
+  Q -->|no| C[Claude splits the next chunk]
+  C --> W
+  Q -->|yes| S[stop]
 ```
