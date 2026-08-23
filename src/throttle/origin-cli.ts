@@ -1,7 +1,14 @@
 import { spawnSync } from "node:child_process";
 
-import { kingsleyBriefText } from "./brief.ts";
-import { DEFAULT_GITHUB_MIRROR, DEFAULT_ORIGIN_REPO, ORIGIN_GIT_HOST, ORIGIN_REMOTE, type ForgeRepo } from "./forge.ts";
+import { productBriefText } from "./brief.ts";
+import {
+  DEFAULT_GITHUB_MIRROR,
+  DEFAULT_ORIGIN_NAMESPACE,
+  DEFAULT_ORIGIN_REPO,
+  ORIGIN_GIT_HOST,
+  ORIGIN_REMOTE,
+  type ForgeRepo,
+} from "./forge.ts";
 
 export const ORIGIN_INSTALL = "curl -fsSL https://downloads.cursor.com/origin/install.sh | sh";
 
@@ -57,32 +64,41 @@ export function addCursorOriginRemote(repoDir: string, forgeRepo: ForgeRepo): st
 
 export function originMirrorCommand(
   githubSlug: string = DEFAULT_GITHUB_MIRROR,
-  namespace: string = "allocations",
+  namespace: string | null = DEFAULT_ORIGIN_NAMESPACE,
 ): string {
+  if (namespace === null) {
+    return `origin repo create-mirrored '${githubSlug}'`;
+  }
   return `origin repo create-mirrored '${githubSlug}' --namespace ${namespace}`;
 }
 
 export function originSetupText(slug: string = DEFAULT_ORIGIN_REPO): string {
-  return `${kingsleyBriefText()}
+  return `${productBriefText()}
+The Origin repo is not created yet. GitHub ${DEFAULT_GITHUB_MIRROR} exists.
+Host it on the personal Origin account ranjan-rgb — not the allocations org.
+${slug} is the personal Origin target, not a live clone URL until origin-setup succeeds.
+
 Origin CLI
 
 ${ORIGIN_INSTALL}
 origin auth login
+npx tsx src/cli.ts origin-setup
 
-To clone an existing repo
+# personal account only — no allocations org
+${originMirrorCommand()}
+${originMirrorCommand(DEFAULT_GITHUB_MIRROR, null)}
+origin repo create Alpha-throttle-test
+origin auth setup-git --local
+git remote add ${ORIGIN_REMOTE} '${ORIGIN_GIT_HOST}/${slug}'
+git push -u ${ORIGIN_REMOTE} HEAD
+
+Clone only after origin-setup reports hosted: yes
 
 ${originCloneCommand(slug)}
 # or use git directly
 ${originGitCloneCommand(slug)}
 
-To host this GitHub tree on Origin
-
-${originMirrorCommand()}
-origin auth setup-git --local
-git remote add ${ORIGIN_REMOTE} '${ORIGIN_GIT_HOST}/${slug}'
-git push -u ${ORIGIN_REMOTE} HEAD
-
-To push a local project
+To push a local project into an Origin repo that already exists
 
 ${originPushInitCommands(slug).join("\n")}
 `;

@@ -5,7 +5,13 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 
-import { originHostPlan, originHostText, runOriginHost, type CommandRunner } from "../src/throttle/host.ts";
+import {
+  originHostPlan,
+  originHostText,
+  parseCreatedOriginSlug,
+  runOriginHost,
+  type CommandRunner,
+} from "../src/throttle/host.ts";
 
 function initTempRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), "origin-host-"));
@@ -15,22 +21,31 @@ function initTempRepo(): string {
   return dir;
 }
 
-test("host plan mirrors GitHub Alpha-throttle-test under allocations", () => {
+test("parseCreatedOriginSlug reads Origin URLs", () => {
+  assert.equal(
+    parseCreatedOriginSlug("Created https://origin.cursor.com/ranjan-rgb/Alpha-throttle-test"),
+    "ranjan-rgb/Alpha-throttle-test",
+  );
+  assert.equal(parseCreatedOriginSlug('{"org":"ranjan-rgb","name":"Alpha-throttle-test"}'), "ranjan-rgb/Alpha-throttle-test");
+});
+
+test("host plan mirrors GitHub onto personal Origin account ranjan-rgb", () => {
   const plan = originHostPlan();
-  assert.equal(plan.originSlug, "allocations/Alpha-throttle-test");
+  assert.equal(plan.originSlug, "ranjan-rgb/Alpha-throttle-test");
   assert.equal(plan.githubSlug, "ranjan2829/Alpha-throttle-test");
+  assert.equal(plan.namespace, "ranjan-rgb");
   assert.deepEqual(plan.createMirrored, [
     "origin",
     "repo",
     "create-mirrored",
     "ranjan2829/Alpha-throttle-test",
     "--namespace",
-    "allocations",
+    "ranjan-rgb",
   ]);
   const text = originHostText(plan);
-  assert.match(text, /Kingsley Advani/);
   assert.match(text, /Make a recursive agent on cursor origin/);
-  assert.match(text, /create-mirrored/);
+  assert.match(text, /ranjan-rgb/);
+  assert.match(text, /not the allocations org/);
 });
 
 test("runOriginHost stops at login when Origin is not authenticated", () => {
@@ -84,7 +99,7 @@ test("runOriginHost mirrors GitHub when the Origin repo is missing", () => {
         "create-mirrored",
         "ranjan2829/Alpha-throttle-test",
         "--namespace",
-        "allocations",
+        "ranjan-rgb",
       ],
     );
     assert.deepEqual(

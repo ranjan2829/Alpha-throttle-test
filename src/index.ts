@@ -6,9 +6,14 @@ export { DEFAULT_BOUNDS } from "./types.ts";
 export { runThrottleLoop } from "./throttle/loop.ts";
 export { learn, plannedBurst, summarizeOutcomes } from "./throttle/policy.ts";
 export { SAFE_POLICY, LIVE_DEFAULT_MAX } from "./throttle/types.ts";
-export { parseRepoSlug, DEFAULT_ORIGIN_REPO, DEFAULT_GITHUB_MIRROR } from "./throttle/forge.ts";
+export {
+  parseRepoSlug,
+  DEFAULT_ORIGIN_REPO,
+  DEFAULT_ORIGIN_NAMESPACE,
+  DEFAULT_GITHUB_MIRROR,
+} from "./throttle/forge.ts";
 export { runOriginHost, originHostPlan, originHostText } from "./throttle/host.ts";
-export { KINGSLEY_BRIEF, kingsleyBriefText } from "./throttle/brief.ts";
+export { PRODUCT_BRIEF, productBriefText } from "./throttle/brief.ts";
 export type {
   AdapterKind,
   Bounds,

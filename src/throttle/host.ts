@@ -1,9 +1,10 @@
 import { spawnSync } from "node:child_process";
 
-import { kingsleyBriefText } from "./brief.ts";
+import { productBriefText } from "./brief.ts";
 import {
   DEFAULT_GITHUB_MIRROR,
   DEFAULT_ORIGIN_REPO,
+  DEFAULT_ORIGIN_REPO_NAME,
   ORIGIN_GIT_HOST,
   ORIGIN_REMOTE,
   parseRepoSlug,
@@ -16,7 +17,16 @@ import {
   originGitCloneCommand,
 } from "./origin-cli.ts";
 
-export type OriginHostStep = "remote" | "auth" | "setup-git" | "view" | "create-mirrored" | "create" | "push";
+export type OriginHostStep =
+  | "remote"
+  | "auth"
+  | "setup-git"
+  | "view"
+  | "create-mirrored"
+  | "create-mirrored-default"
+  | "create"
+  | "retarget"
+  | "push";
 
 export interface CommandResult {
   status: number;
@@ -30,9 +40,11 @@ export interface OriginHostPlan {
   originSlug: string;
   githubSlug: string;
   namespace: string;
+  repoName: string;
   install: string;
   login: string;
   createMirrored: string[];
+  createMirroredDefault: string[];
   createEmpty: string[];
   setupGit: string[];
   clone: string;
@@ -50,10 +62,25 @@ export interface OriginHostStepResult {
 export interface OriginHostResult {
   ok: boolean;
   hosted: boolean;
+  exists: boolean;
   auth: { ok: boolean; detail: string };
   plan: OriginHostPlan;
   steps: OriginHostStepResult[];
+  hostedSlug: string | null;
   text: string;
+}
+
+export function parseCreatedOriginSlug(text: string): string | null {
+  const url = text.match(/origin\.cursor\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/);
+  if (url?.[1]) {
+    return url[1].replace(/\.git$/, "");
+  }
+  const jsonOrg = text.match(/"org"\s*:\s*"([^"]+)"/);
+  const jsonName = text.match(/"name"\s*:\s*"([^"]+)"/);
+  if (jsonOrg?.[1] && jsonName?.[1]) {
+    return `${jsonOrg[1]}/${jsonName[1]}`;
+  }
+  return null;
 }
 
 export function originHostPlan(
@@ -65,10 +92,12 @@ export function originHostPlan(
     originSlug: origin.slug,
     githubSlug,
     namespace: origin.owner,
+    repoName: origin.repo,
     install: ORIGIN_INSTALL,
     login: "origin auth login",
     createMirrored: ["origin", "repo", "create-mirrored", githubSlug, "--namespace", origin.owner],
-    createEmpty: ["origin", "repo", "create", origin.slug],
+    createMirroredDefault: ["origin", "repo", "create-mirrored", githubSlug],
+    createEmpty: ["origin", "repo", "create", origin.repo || DEFAULT_ORIGIN_REPO_NAME],
     setupGit: ["origin", "auth", "setup-git", "--local"],
     clone: originCloneCommand(origin.slug),
     gitClone: originGitCloneCommand(origin.slug),
@@ -78,21 +107,29 @@ export function originHostPlan(
 }
 
 export function originHostText(plan: OriginHostPlan = originHostPlan()): string {
-  return `${kingsleyBriefText()}
-Host the recursive agent on Cursor Origin.
+  return `${productBriefText()}
+The Origin repo is not created yet.
+
+GitHub (exists): ${plan.githubSlug}
+  https://github.com/${plan.githubSlug}
+Origin target (create after login): ${plan.originSlug}
+  ${ORIGIN_GIT_HOST}/${plan.originSlug}
+
+Do not clone the Origin URL until origin-setup reports hosted: yes.
 
 ${plan.install}
 ${plan.login}
 
-# Mirror the GitHub Alpha-throttle-test tree onto Origin
+# Personal Origin account only (ranjan-rgb), not the allocations org
 ${plan.createMirrored.join(" ")}
+${plan.createMirroredDefault.join(" ")}
+${plan.createEmpty.join(" ")}
 ${plan.setupGit.join(" ")}
 git remote add ${ORIGIN_REMOTE} '${ORIGIN_GIT_HOST}/${plan.originSlug}'
 ${plan.pushHead.join(" ")}
 
-# Or clone if the Origin repo already exists
+# Clone only after the repo exists
 ${plan.clone}
-# or use git directly
 ${plan.gitClone}
 `;
 }
@@ -123,17 +160,17 @@ export function runOriginHost(options: {
   const push = options.push ?? true;
   const runner = options.runner ?? defaultCommandRunner;
   const plan = originHostPlan(originSlug, githubSlug);
-  const forgeRepo = parseRepoSlug(plan.originSlug, "origin");
   const steps: OriginHostStepResult[] = [];
 
-  const remoteDetail = addCursorOriginRemote(options.repoDir, forgeRepo);
+  let hostedSlug: string | null = null;
+  const remoteDetail = addCursorOriginRemote(options.repoDir, parseRepoSlug(plan.originSlug, "origin"));
   steps.push({ step: "remote", ok: true, detail: remoteDetail });
 
   const auth = options.authStatus ?? originAuthStatus();
   steps.push({ step: "auth", ok: auth.ok, detail: auth.detail });
 
   if (!auth.ok) {
-    return finish(false, false, auth, plan, steps);
+    return finish(false, false, false, auth, plan, steps, null);
   }
 
   const setup = runner(plan.setupGit, options.repoDir);
@@ -148,11 +185,13 @@ export function runOriginHost(options: {
   steps.push({
     step: "view",
     ok: viewOk,
-    detail: trimOutput(viewed) || (viewOk ? plan.originSlug : "Origin repo not found"),
+    detail: trimOutput(viewed) || (viewOk ? plan.originSlug : `${plan.originSlug} does not exist`),
   });
 
   let hosted = viewOk;
-  if (!viewOk) {
+  if (viewOk) {
+    hostedSlug = parseCreatedOriginSlug(trimOutput(viewed)) ?? plan.originSlug;
+  } else {
     const mirrored = runner(plan.createMirrored, options.repoDir);
     const mirroredOk = mirrored.status === 0;
     steps.push({
@@ -161,16 +200,38 @@ export function runOriginHost(options: {
       detail: trimOutput(mirrored) || plan.createMirrored.join(" "),
     });
     hosted = mirroredOk;
-    if (!mirroredOk) {
-      const created = runner(plan.createEmpty, options.repoDir);
-      const createdOk = created.status === 0;
+    if (mirroredOk) {
+      hostedSlug = parseCreatedOriginSlug(trimOutput(mirrored)) ?? plan.originSlug;
+    } else {
+      const fallback = runner(plan.createMirroredDefault, options.repoDir);
+      const fallbackOk = fallback.status === 0;
       steps.push({
-        step: "create",
-        ok: createdOk,
-        detail: trimOutput(created) || plan.createEmpty.join(" "),
+        step: "create-mirrored-default",
+        ok: fallbackOk,
+        detail: trimOutput(fallback) || plan.createMirroredDefault.join(" "),
       });
-      hosted = createdOk;
+      hosted = fallbackOk;
+      if (fallbackOk) {
+        hostedSlug = parseCreatedOriginSlug(trimOutput(fallback));
+      } else {
+        const created = runner(plan.createEmpty, options.repoDir);
+        const createdOk = created.status === 0;
+        steps.push({
+          step: "create",
+          ok: createdOk,
+          detail: trimOutput(created) || plan.createEmpty.join(" "),
+        });
+        hosted = createdOk;
+        if (createdOk) {
+          hostedSlug = parseCreatedOriginSlug(trimOutput(created));
+        }
+      }
     }
+  }
+
+  if (hosted && hostedSlug && hostedSlug !== plan.originSlug) {
+    const retarget = addCursorOriginRemote(options.repoDir, parseRepoSlug(hostedSlug, "origin"));
+    steps.push({ step: "retarget", ok: true, detail: retarget });
   }
 
   if (push && hosted) {
@@ -180,10 +241,10 @@ export function runOriginHost(options: {
       ok: pushed.status === 0,
       detail: trimOutput(pushed) || plan.pushHead.join(" "),
     });
-    return finish(pushed.status === 0, hosted, auth, plan, steps);
+    return finish(pushed.status === 0, hosted, viewOk, auth, plan, steps, hostedSlug);
   }
 
-  return finish(hosted, hosted, auth, plan, steps);
+  return finish(hosted, hosted, viewOk, auth, plan, steps, hostedSlug);
 }
 
 function trimOutput(result: CommandResult): string {
@@ -193,11 +254,13 @@ function trimOutput(result: CommandResult): string {
 function finish(
   ok: boolean,
   hosted: boolean,
+  exists: boolean,
   auth: { ok: boolean; detail: string },
   plan: OriginHostPlan,
   steps: OriginHostStepResult[],
+  hostedSlug: string | null,
 ): OriginHostResult {
   const stepLines = steps.map((row) => `${row.ok ? "ok" : "need"}  ${row.step}: ${row.detail}`).join("\n");
-  const text = `${originHostText(plan)}\n${stepLines}\n\nhosted: ${hosted ? "yes" : "no"}  auth: ${auth.ok ? "ok" : "needed"}\n`;
-  return { ok, hosted, auth, plan, steps, text };
+  const text = `${originHostText(plan)}\n${stepLines}\n\nexists: ${exists ? "yes" : "no"}  hosted: ${hosted ? "yes" : "no"}  auth: ${auth.ok ? "ok" : "needed"}  slug: ${hostedSlug ?? "(none)"}\n`;
+  return { ok, hosted, exists, auth, plan, steps, hostedSlug, text };
 }

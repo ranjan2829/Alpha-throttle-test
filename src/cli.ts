@@ -302,10 +302,10 @@ Usage:
   npx tsx src/cli.ts throttle [--workspace .alpha/throttle]
       [--rate 2] [--max 8] [--concurrency 2] [--episodes 3]
       [--throttle-after 0]
-  npx tsx src/cli.ts origin-setup [--repo allocations/Alpha-throttle-test]
+  npx tsx src/cli.ts origin-setup [--repo ranjan-rgb/Alpha-throttle-test]
       [--github ranjan2829/Alpha-throttle-test] [--no-push]
   npx tsx src/cli.ts throttle --live --max 3 --rate 1 --forge origin
-      [--repo allocations/Alpha-throttle-test]
+      [--repo ranjan-rgb/Alpha-throttle-test]
 
 Throttle defaults are SAFE (dry-run). --live opens real Origin changes
 (--forge origin, default) and caps --max at 3 unless you pass --max.
