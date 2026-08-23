@@ -43,7 +43,6 @@ test("host plan mirrors GitHub onto personal Origin account ranjan-rgb", () => {
     "ranjan-rgb",
   ]);
   const text = originHostText(plan);
-  assert.match(text, /Kingsley Advani/);
   assert.match(text, /Make a recursive agent on cursor origin/);
   assert.match(text, /ranjan-rgb/);
   assert.match(text, /not the allocations org/);

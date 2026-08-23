@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-import { kingsleyBriefText } from "./brief.ts";
+import { productBriefText } from "./brief.ts";
 import {
   DEFAULT_GITHUB_MIRROR,
   DEFAULT_ORIGIN_NAMESPACE,
@@ -73,7 +73,7 @@ export function originMirrorCommand(
 }
 
 export function originSetupText(slug: string = DEFAULT_ORIGIN_REPO): string {
-  return `${kingsleyBriefText()}
+  return `${productBriefText()}
 The Origin repo is not created yet. GitHub ${DEFAULT_GITHUB_MIRROR} exists.
 Host it on the personal Origin account ranjan-rgb — not the allocations org.
 ${slug} is the personal Origin target, not a live clone URL until origin-setup succeeds.

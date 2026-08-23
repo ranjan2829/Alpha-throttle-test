@@ -1,6 +1,6 @@
 You are running this harness on Cursor Origin.
 
-Kingsley Advani (22 Aug 2026): Cursor origin · Alpha throttle test · make a recursive agent on cursor origin.
+Cursor origin · Alpha throttle test · make a recursive agent on cursor origin.
 
 Host on the personal Origin account **ranjan-rgb**, not the allocations org.
 

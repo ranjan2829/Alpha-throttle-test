@@ -2,7 +2,7 @@
 
 Bounded recursive-agent harness for **Cursor Origin / cloud agents**.
 
-Kingsley Advani (22 Aug 2026): Cursor origin · Alpha throttle test · **Make a recursive agent on cursor origin**.
+Cursor origin · Alpha throttle test · **Make a recursive agent on cursor origin**.
 
 This repo is that agent. GitHub is `ranjan2829/Alpha-throttle-test`. Origin is the personal account `ranjan-rgb/Alpha-throttle-test` — not the allocations org. The Origin copy is created by `origin-setup` after login.
 
@@ -109,7 +109,7 @@ Host the recursive agent on Origin as `ranjan-rgb/Alpha-throttle-test` (personal
 npx tsx src/cli.ts origin-setup
 ```
 
-That prints Kingsley's brief and the official Origin flow, adds remote `cursor-origin`, and — when `origin auth login` has been run — mirrors GitHub and pushes `HEAD`:
+That prints the official Origin flow, adds remote `cursor-origin`, and — when `origin auth login` has been run — mirrors GitHub and pushes `HEAD`:
 
 ```bash
 curl -fsSL https://downloads.cursor.com/origin/install.sh | sh

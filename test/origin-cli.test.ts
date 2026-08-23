@@ -11,7 +11,6 @@ import {
 
 test("Origin setup text targets the personal ranjan-rgb account", () => {
   const text = originSetupText("ranjan-rgb/Alpha-throttle-test");
-  assert.match(text, /Kingsley Advani/);
   assert.match(text, /Make a recursive agent on cursor origin/);
   assert.match(text, /ranjan-rgb/);
   assert.match(text, /not the allocations org/);

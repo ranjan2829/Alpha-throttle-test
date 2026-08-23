@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-import { kingsleyBriefText } from "./brief.ts";
+import { productBriefText } from "./brief.ts";
 import {
   DEFAULT_GITHUB_MIRROR,
   DEFAULT_ORIGIN_REPO,
@@ -107,7 +107,7 @@ export function originHostPlan(
 }
 
 export function originHostText(plan: OriginHostPlan = originHostPlan()): string {
-  return `${kingsleyBriefText()}
+  return `${productBriefText()}
 The Origin repo is not created yet.
 
 GitHub (exists): ${plan.githubSlug}
