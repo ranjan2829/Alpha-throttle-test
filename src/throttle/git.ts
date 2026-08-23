@@ -110,19 +110,16 @@ async function writeUniqueCommitUnlocked(options: {
   const env = { ...process.env, GIT_INDEX_FILE: indexFile };
   try {
     await runProc(options.repoDir, ["git", "read-tree", options.parentSha], env);
-    const blob = await hashBlob(options.repoDir, options.body);
-    if (!/^[0-9a-f]{40,64}$/i.test(blob)) {
-      throw new Error(`git hash-object returned invalid blob '${blob}'`);
-    }
+    const blob = await retrySha("hash-object", () => hashBlob(options.repoDir, options.body));
     await runProc(
       options.repoDir,
       ["git", "update-index", "--add", "--cacheinfo", "100644", blob, options.path],
       env,
     );
-    const tree = (await runProc(options.repoDir, ["git", "write-tree"], env)).stdout.trim();
-    if (!/^[0-9a-f]{40,64}$/i.test(tree)) {
-      throw new Error(`git write-tree returned invalid tree '${tree}'`);
-    }
+    const tree = await retrySha(
+      "write-tree",
+      async () => (await runProc(options.repoDir, ["git", "write-tree"], env)).stdout.trim(),
+    );
     const identity = await gitIdentity(options.repoDir);
     const commitEnv = {
       ...env,
@@ -131,20 +128,33 @@ async function writeUniqueCommitUnlocked(options: {
       GIT_COMMITTER_NAME: identity.name,
       GIT_COMMITTER_EMAIL: identity.email,
     };
-    const commit = (
-      await runProc(
-        options.repoDir,
-        ["git", "commit-tree", tree, "-p", options.parentSha, "-m", options.message],
-        commitEnv,
-      )
-    ).stdout.trim();
-    if (!/^[0-9a-f]{40,64}$/i.test(commit)) {
-      throw new Error(`git commit-tree returned invalid commit '${commit}'`);
-    }
+    const commit = await retrySha(
+      "commit-tree",
+      async () =>
+        (
+          await runProc(
+            options.repoDir,
+            ["git", "commit-tree", tree, "-p", options.parentSha, "-m", options.message],
+            commitEnv,
+          )
+        ).stdout.trim(),
+    );
     return commit;
   } finally {
     rmSync(indexDir, { recursive: true, force: true });
   }
+}
+
+async function retrySha(label: string, fn: () => Promise<string>): Promise<string> {
+  let last = "";
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    last = (await fn()).trim();
+    if (/^[0-9a-f]{40,64}$/i.test(last)) return last;
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 20 * attempt);
+    });
+  }
+  throw new Error(`git ${label} returned invalid sha '${last}'`);
 }
 
 async function hashBlob(repoDir: string, body: string): Promise<string> {
