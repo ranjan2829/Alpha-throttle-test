@@ -199,20 +199,37 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
     ? intFlag(args, "concurrency", SAFE_POLICY.concurrency)
     : SAFE_POLICY.concurrency;
   const perMinute = args.flags.has("per-minute") ? intFlag(args, "per-minute", 0) : null;
+  const untilMerged = args.flags.has("until-merged") ? intFlag(args, "until-merged", 0) : null;
+  const chunk = args.flags.has("chunk")
+    ? intFlag(args, "chunk", 200)
+    : untilMerged !== null && untilMerged > 0
+      ? 200
+      : 0;
   const target = resolveAgentTarget({
     perMinute,
     ratePerSec: rate,
-    maxPrs: maxPrsPerRun,
+    maxPrs:
+      untilMerged !== null && untilMerged > 0
+        ? Math.max(maxPrsPerRun, untilMerged * 3)
+        : maxPrsPerRun,
     concurrency,
   });
   const maxEpisodes = args.flags.has("episodes")
     ? intFlag(args, "episodes", live ? 1 : 3)
-    : live
-      ? 1
-      : 3;
+    : untilMerged !== null && untilMerged > 0
+      ? Math.max(50, Math.ceil((untilMerged * 3) / Math.max(chunk, 1)))
+      : live
+        ? 1
+        : 3;
   const clock = systemClock();
-  const burstAll = mode.agent || perMinute !== null;
+  const burstAll = (mode.agent || perMinute !== null) && (untilMerged === null || untilMerged <= 0);
   const policy = policyForAgentTarget(target, clock.now(), live, burstAll);
+  if (untilMerged !== null && untilMerged > 0 && chunk > 0) {
+    policy.currentRatePerSec = chunk;
+    policy.maxOpenPrs = Math.max(policy.maxOpenPrs, chunk, target.concurrency);
+    policy.maxPrsPerRun = target.maxPrs;
+    policy.reason = live ? "until-merged live" : "until-merged dry-run";
+  }
   const forge = parseForgeFlag(args.flags.get("forge"));
   const repoFlag = args.flags.get("repo") ?? process.env.ALPHA_THROTTLE_REPO ?? DEFAULT_ORIGIN_REPO;
   const forgeRepo = parseRepoSlug(repoFlag, forge);
@@ -230,6 +247,18 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
     "merge-concurrency",
     mode.agent && live ? Math.min(16, Math.max(4, target.concurrency)) : 1,
   );
+  const sweep =
+    live && merge && untilMerged !== null && untilMerged > 0
+      ? async () => {
+          const finished = await finishOpenOriginChanges({
+            repoDir: process.cwd(),
+            repo: forgeRepo.slug,
+            limit: Math.max(chunk * 2, 50),
+            concurrency: Math.min(10, mergeConcurrency),
+          });
+          return finished.merged;
+        }
+      : undefined;
   const adapter = live
     ? createLiveAdapter({
         clock,
@@ -262,7 +291,7 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
   const label = mode.agent ? "recursive agent" : "throttle";
   if (live) {
     process.stdout.write(
-      `LIVE ${label} (${forgeRepo.forge} ${forgeRepo.slug}): planner=${planner} max=${target.maxPrs} rate=${target.ratePerSec}/s concurrency=${target.concurrency} mergeConcurrency=${mergeConcurrency} window=${target.window}\n`,
+      `LIVE ${label} (${forgeRepo.forge} ${forgeRepo.slug}): planner=${planner} max=${target.maxPrs} untilMerged=${untilMerged ?? "off"} chunk=${chunk || "off"} rate=${target.ratePerSec}/s concurrency=${target.concurrency} mergeConcurrency=${mergeConcurrency} window=${target.window}\n`,
     );
   } else {
     process.stdout.write(
@@ -280,11 +309,19 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
     maxDepth: intFlag(args, "max-depth", 3),
     live,
     claude,
+    ...(untilMerged !== null && untilMerged > 0 ? { untilMerged } : {}),
+    ...(chunk > 0 ? { chunk } : {}),
+    ...(sweep ? { sweep } : {}),
   });
+  const compact = result.outcomes.length >= 100;
   const report = {
     adapter: adapter.kind,
     forge: live ? forgeRepo : { forge: "dry-run", slug: forgeRepo.slug },
+    untilMerged,
+    merged: result.merged,
+    sweptMerged: result.sweptMerged,
     openedOrDry: result.openedOrDry,
+    attempted: result.outcomes.length,
     episodes: result.episodes.map((episode) => ({
       id: episode.id,
       burst: episode.plannedBurst,
@@ -294,21 +331,31 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
       reason: episode.policyAfter.reason,
     })),
     policy: result.policy,
-    outcomes: result.outcomes.map((item) => ({
-      ticketId: item.ticketId,
-      status: item.status,
-      httpStatus: item.httpStatus,
-      prUrl: item.prUrl,
-      latencyMs: item.latencyMs,
-      mergeMs: item.mergeMs,
-      checkStatus: item.checkStatus,
-      checkCount: item.checkCount,
-    })),
+    outcomes: compact
+      ? undefined
+      : result.outcomes.map((item) => ({
+          ticketId: item.ticketId,
+          status: item.status,
+          httpStatus: item.httpStatus,
+          prUrl: item.prUrl,
+          latencyMs: item.latencyMs,
+          mergeMs: item.mergeMs,
+          checkStatus: item.checkStatus,
+          checkCount: item.checkCount,
+        })),
+    statusCounts: {
+      merged: result.outcomes.filter((item) => item.status === "merged").length,
+      opened: result.outcomes.filter((item) => item.status === "opened").length,
+      dryRun: result.outcomes.filter((item) => item.status === "dry-run").length,
+      error: result.outcomes.filter((item) => item.status === "error").length,
+      throttled: result.outcomes.filter((item) => item.status === "throttled").length,
+      rejected: result.outcomes.filter((item) => item.status === "rejected").length,
+    },
   };
   writeFileSync(join(workspace, "throttle-report.json"), `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`workspace: ${workspace}\n`);
-  return 0;
+  return untilMerged !== null && untilMerged > 0 && result.merged < untilMerged ? 1 : 0;
 }
 
 async function commandOriginFinish(args: CliArgs): Promise<number> {
@@ -374,6 +421,7 @@ Usage:
   npx tsx src/cli.ts tree --workspace .alpha/my-goal
   npx tsx src/cli.ts smoke
   npx tsx src/cli.ts agent [--live] [--per-minute 500] [--max 500]
+      [--until-merged 10000] [--chunk 200]
       [--concurrency 16] [--forge origin]
       [--repo allocations/Alpha-throttle-test]
   npx tsx src/cli.ts throttle [--workspace .alpha/throttle]
@@ -388,13 +436,13 @@ Usage:
 
 Recursive agent (Origin throttle test):
   export ANTHROPIC_API_KEY=sk-...
-  npx tsx src/cli.ts agent --live --per-minute 500 --forge origin \\
-      --repo allocations/Alpha-throttle-test
+  npx tsx src/cli.ts agent --live --until-merged 10000 --chunk 200 \\
+      --concurrency 16 --forge origin --repo allocations/Alpha-throttle-test
 
 Claude is optional. Without a key the same tree still splits; with a key
 Claude is the planner. Each leaf opens one unique-file PR, checks the
-build, then merges. 500/sec is not possible over Origin HTTP. 500/min is
-the live target.
+build, then merges. 500/sec is not possible over Origin HTTP.
+--until-merged 10000 keeps chunking until that many PRs merge.
 
 Throttle defaults are SAFE (dry-run). --live opens real Origin changes
 and caps --max at 3 unless you pass --max or --per-minute.

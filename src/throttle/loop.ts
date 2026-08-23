@@ -37,6 +37,12 @@ export interface ThrottleRunOptions {
   maxDepth: number;
   live: boolean;
   claude?: ClaudeClient | null;
+  /** Stop once this many tickets merge (dry-run counts as merged). */
+  untilMerged?: number | null;
+  /** Episode size when untilMerged is set. */
+  chunk?: number;
+  /** Optional sweep of leftover open PRs between episodes. Returns extra merges. */
+  sweep?: () => Promise<number>;
 }
 
 export interface ThrottleRunResult {
@@ -44,6 +50,8 @@ export interface ThrottleRunResult {
   episodes: Episode[];
   outcomes: TicketOutcome[];
   openedOrDry: number;
+  merged: number;
+  sweptMerged: number;
 }
 
 export async function runThrottleLoop(options: ThrottleRunOptions): Promise<ThrottleRunResult> {
@@ -55,11 +63,24 @@ export async function runThrottleLoop(options: ThrottleRunOptions): Promise<Thro
   const episodes: Episode[] = [];
   const allOutcomes: TicketOutcome[] = [];
   let seq = 0;
+  let sweptMerged = 0;
+  const untilMerged = options.untilMerged ?? null;
+  const chunk = options.chunk ?? 0;
+
+  const mergedCount = (): number =>
+    allOutcomes.filter((item) => countsAsMerged(item, options.live)).length + sweptMerged;
 
   for (let episodeIndex = 0; episodeIndex < options.maxEpisodes; episodeIndex += 1) {
-    const remaining = options.maxPrsPerRun - allOutcomes.length;
-    if (remaining <= 0) break;
-    const burst = plannedBurst(policy, allOutcomes.length, options.maxPrsPerRun);
+    if (untilMerged !== null && mergedCount() >= untilMerged) break;
+    const remainingAttempts = options.maxPrsPerRun - allOutcomes.length;
+    if (remainingAttempts <= 0) break;
+    const remainingMerges =
+      untilMerged === null ? remainingAttempts : Math.max(0, untilMerged - mergedCount());
+    const burstCap = chunk > 0 ? Math.min(chunk, remainingAttempts, Math.max(remainingMerges, 1)) : remainingAttempts;
+    const burst = Math.min(
+      plannedBurst(policy, allOutcomes.length, options.maxPrsPerRun),
+      burstCap,
+    );
     if (burst <= 0) break;
 
     const tickets: TicketSpec[] = [];
@@ -106,6 +127,23 @@ export async function runThrottleLoop(options: ThrottleRunOptions): Promise<Thro
     policy = next;
     savePolicy(paths, policy);
     writeFileSync(join(paths.root, "last-episode.json"), `${JSON.stringify(episode, null, 2)}\n`);
+    writeFileSync(
+      join(paths.root, "progress.json"),
+      `${JSON.stringify(
+        {
+          merged: mergedCount(),
+          untilMerged,
+          attempted: allOutcomes.length,
+          sweptMerged,
+          episode: episode.id,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    if (options.sweep && (untilMerged === null || mergedCount() < untilMerged)) {
+      sweptMerged += await options.sweep();
+    }
     if (stats.throttled429 > 0 && options.live) {
       break;
     }
@@ -116,7 +154,14 @@ export async function runThrottleLoop(options: ThrottleRunOptions): Promise<Thro
     episodes,
     outcomes: allOutcomes,
     openedOrDry: allOutcomes.filter((item) => item.status === "dry-run" || item.status === "opened" || item.status === "merged").length,
+    merged: mergedCount(),
+    sweptMerged,
   };
+}
+
+export function countsAsMerged(outcome: TicketOutcome, live: boolean): boolean {
+  if (outcome.status === "merged") return true;
+  return !live && outcome.status === "dry-run";
 }
 
 async function runBurst(args: {

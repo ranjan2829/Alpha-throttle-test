@@ -127,8 +127,8 @@ npm run smoke
 # dry-run — no PRs
 npx tsx src/cli.ts agent --max 16 --concurrency 8
 
-# live — Claude planner if .env has ANTHROPIC_API_KEY
-npx tsx src/cli.ts agent --live --per-minute 500 --concurrency 16 \
+# live — keep going until 10k PRs merge (chunked)
+npx tsx src/cli.ts agent --live --until-merged 10000 --chunk 200 --concurrency 16 \
   --forge origin --repo allocations/Alpha-throttle-test
 ```
 

@@ -68,6 +68,27 @@ test("plannedBurst never exceeds maxPrsPerRun or maxOpenPrs", () => {
   assert.equal(plannedBurst(policy({ currentRatePerSec: 1000, maxOpenPrs: 50 }), 8, 8), 0);
 });
 
+test("until-merged keeps chunking until the dry-run merge count hits the target", async () => {
+  const workspace = tmpWorkspace();
+  const clock = fakeClock();
+  const result = await runThrottleLoop({
+    workspace,
+    adapter: createDryRunAdapter({ clock, throttleAfter: 0, latencyMs: 0 }),
+    clock,
+    policy: policy({ currentRatePerSec: 5, maxPrsPerRun: 40, concurrency: 2, maxOpenPrs: 8 }),
+    maxPrsPerRun: 40,
+    maxEpisodes: 20,
+    maxDepth: 2,
+    live: false,
+    untilMerged: 12,
+    chunk: 5,
+  });
+  assert.ok(result.merged >= 12);
+  assert.ok(result.outcomes.length >= 12);
+  assert.ok(result.outcomes.length <= 15);
+  assert.ok(result.episodes.length >= 3);
+});
+
 test("dry-run loop uses a Claude split then still writes dry-run outcomes", async () => {
   const workspace = tmpWorkspace();
   const clock = fakeClock();
