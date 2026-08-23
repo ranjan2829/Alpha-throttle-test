@@ -48,11 +48,11 @@
   },
   "running": {
     "untilMerged": 100000,
-    "merged": 3779,
-    "attempted": 4000,
-    "sweptMerged": 890,
+    "merged": 4432,
+    "attempted": 4800,
+    "sweptMerged": 1002,
     "throttled429": 0,
-    "episode": "ep-3",
+    "episode": "ep-5",
     "planner": "claude",
     "note": "in progress; same workspace resumes from progress.json"
   },

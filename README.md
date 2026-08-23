@@ -1,104 +1,78 @@
 # Alpha-throttle-test
 
-Recursive planner → worker → verifier agent for **Cursor Origin**.
+Cursor Origin recursive agent. Measured **23 Aug 2026**. Forge: [`allocations/Alpha-throttle-test`](https://cursor.com/codebase/allocations/Alpha-throttle-test). CI: none. 429s: **0**.
 
-GitHub: `ranjan2829/Alpha-throttle-test`  
-Origin (live): [`allocations/Alpha-throttle-test`](https://cursor.com/codebase/allocations/Alpha-throttle-test)
-
-Claude splits each burst. The same function calls itself on each slice until `maxDepth`. Leaves open one unique-file PR, then merge-commit. Ticket author: **Ranjan S `<ranjan@allocations.com>`**.
-
-Machine-readable copy: [`reports/live-origin.json`](reports/live-origin.json). Measured **23 Aug 2026**. CI on this repo: **none**. HTTP 429s across every live run below: **0**.
+[`reports/live-origin.json`](reports/live-origin.json)
 
 ---
 
-## Cleanest results
+## Stats
 
-### 8 / 8 — zero defects
+### Proof — 8 / 8
 
-| | |
+| attempted | opened | merged | errors | 429 | wall | open | merge |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 8 | 8 | **8** | 0 | 0 | 8.1 s | 1 415 ms | 3 399 ms |
+
+PRs [#56](https://cursor.com/codebase/allocations/Alpha-throttle-test/pull/56)–[#63](https://cursor.com/codebase/allocations/Alpha-throttle-test/pull/63)
+
+### Clean volume — 1 200 attempts
+
+Six 200-ticket episodes. 0 errors.
+
+| attempted | opened | merged | swept | errors | 429 | wall |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 200 | 1 200 | **1 019** | +37 | 0 | 0 | 9.6 min |
+
+| | / min |
 | --- | ---: |
-| Attempted / opened / merged | **8 / 8 / 8** |
-| Errors / 429s / build failures | **0 / 0 / 0** |
-| Wall | **8.1 s** |
-| Avg open | 1 415 ms |
-| Avg merge | 3 399 ms |
-| PRs | [#56](https://cursor.com/codebase/allocations/Alpha-throttle-test/pull/56)–[#63](https://cursor.com/codebase/allocations/Alpha-throttle-test/pull/63) |
+| open | **124.5** |
+| merge | **105.7** |
 
-This is the clean proof: every ticket became a merged Origin PR.
+### Live — Claude planner
 
-### 1,200 attempts — still zero errors
+| merged | target | attempted | swept | 429 | planner |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| **4 432** | 100 000 | 4 800 | 1 002 | 0 | Claude Sonnet 5 |
 
-Six 200-ticket episodes, 19:15–19:25 UTC. No empty SHAs. No 429s.
-
-| | |
-| --- | ---: |
-| Wall | **9.6 min** (578.5 s) |
-| Attempted | **1 200** |
-| Opened | **1 200** (100%) |
-| Merged in-loop | 982 |
-| Swept | +37 |
-| **Merged** | **1 019** |
-| Errors / 429s | **0 / 0** |
-
-| | per minute |
-| --- | ---: |
-| Attempted / opened | **124.5** |
-| Merged (with sweep) | **105.7** |
-
-That is the clean high-volume ceiling on this host: about **125 opens / min**, **106 merges / min**. Not 500/s. Not 500/min.
-
-### Live — Claude planner, still running
-
-Same workspace, now with Claude cutting each 400-ticket burst. Target **100 000** merges. Snapshot after the last finished episode:
-
-| | |
-| --- | ---: |
-| Merged | **3 779** / 100 000 |
-| Attempted | 4 000 |
-| Swept | 890 |
-| 429s | **0** |
-| Planner | Claude Sonnet 5 |
-
-First Claude cut of 400 tickets: **`[100, 100, 100, 100]`** — not the deterministic `[200, 200]`. Depth-1 cuts included `[34, 33, 33]`, `[25, 25, 25, 25]`, and ten 10s. Leaves at `maxDepth` stay deterministic. Cuts are appended to `claude-splits.jsonl`.
+First Claude cut of 400: `[100, 100, 100, 100]`
 
 ---
 
-## How the recursion works
+## How the agent works
 
-```
-Claude planner                         depth 0
-        ├── planner                    depth 1
-        │     └── worker → unique file → Origin PR → merge
-        └── planner                    depth 1
-              └── worker
-```
-
-Hard stop: `maxDepth`. One process, not 500 cloud agents. Every ticket is `tickets/<run>/<seq>.md` on a frozen `main` SHA, so PRs are siblings. Merges use `--merge`, not squash, so the allocations email survives on the ticket commit.
-
----
-
-## Run
-
-```bash
-npm install
-npm test
-
-# dry-run — no PRs
-npx tsx src/cli.ts agent --max 16 --concurrency 8
-
-# live — Claude plans; keep going until 100k merges
-npx tsx src/cli.ts agent --live --until-merged 100000 --chunk 400 --concurrency 32 \
-  --forge origin --repo allocations/Alpha-throttle-test
+```mermaid
+flowchart TD
+  G["goal / burst N"] --> P0["Claude planner  depth 0"]
+  P0 -->|"split"| P1a["planner  depth 1"]
+  P0 -->|"split"| P1b["planner  depth 1"]
+  P1a -->|"depth + 1"| L1["leaf workers"]
+  P1b -->|"depth + 1"| L2["leaf workers"]
+  L1 --> V["verifier"]
+  L2 --> V
+  P0 -.->|"depth >= maxDepth = 3"| STOP["stop"]
 ```
 
-Copy `.env.example` to `.env`. Never commit the key. Live agent requires `ANTHROPIC_API_KEY` unless you pass `--fast`.
+```mermaid
+flowchart LR
+  W["worker"] --> F["tickets/run/seq.md<br/>frozen main SHA"]
+  F --> PR["Origin PR<br/>sibling, not stacked"]
+  PR --> C["checks  none"]
+  C --> M["merge-commit"]
+  M --> R["outcome"]
+  R -->|"merged < target"| W
+```
 
-`--live` without `--max` / `--per-minute` / `--until-merged` caps at 3 PRs.
+```mermaid
+flowchart TD
+  subgraph bounds
+    D["maxDepth = 3"]
+    K["maxConcurrentChildren"]
+    S["maxResawnsPerTask = 2"]
+  end
+  V{"verifier"} -->|accept| DNE["done"]
+  V -->|reject| RS["respawn worker"]
+  RS --> S
+```
 
-| Bound | Default | Meaning |
-| --- | ---: | --- |
-| `maxDepth` | 3 | Root is 0. No spawn past this. |
-| `maxConcurrentChildren` | 3 | In-flight children of one planner |
-| `maxResawnsPerTask` | 2 | Verifier rejects may respawn this many times |
-
-A rerun of the same `--workspace` resumes from `progress.json`.
+Author: **Ranjan S `<ranjan@allocations.com>`**. Merge, not squash.
