@@ -29,12 +29,12 @@ Claude does **not** write the tickets or merge the PRs. It only cuts the burst.
 
 ```mermaid
 flowchart TD
-  T[recursive AI agent] --> C[Claude Sonnet 5 Anthropic API]
-  C -->|JSON split · depth + 1| P1[planner depth 1]
+  T[400 tickets] --> C[Claude Sonnet 5 Anthropic API]
+  C -->|JSON split 400 to 100 100 100 100| P1[planner depth 1]
   C --> P2[planner depth 1]
   C --> P3[planner depth 1]
   C --> P4[planner depth 1]
-  P1 -->|Claude again · smaller slice| L1[leaf workers]
+  P1 -->|Claude again 100 to 25 25 25 25| L1[leaf workers]
   P2 --> L2[leaf workers]
   P3 --> L3[leaf workers]
   P4 --> L4[leaf workers]
