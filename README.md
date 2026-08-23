@@ -4,7 +4,7 @@ Bounded recursive-agent harness for **Cursor Origin / cloud agents**.
 
 Kingsley Advani (22 Aug 2026): Cursor origin · Alpha throttle test · **Make a recursive agent on cursor origin**.
 
-This repo is that agent. GitHub (`ranjan2829/Alpha-throttle-test`) is the working copy. Origin (`allocations/Alpha-throttle-test`) is the host. `origin-setup` mirrors the GitHub tree onto Origin once you are logged in.
+This repo is that agent. GitHub is `ranjan2829/Alpha-throttle-test`. Origin is the personal account `ranjan-rgb/Alpha-throttle-test` — not the allocations org. The Origin copy is created by `origin-setup` after login.
 
 A root planner owns a user goal, writes `plan.json`, and a script runs the spawn → wait → handoff loop. Workers and verifiers never talk to each other. They report up through JSON handoffs on disk. The loop stops when the goal is met or a hard depth / concurrency / respawn cap is hit.
 
@@ -103,7 +103,7 @@ Workspace layout after a run:
 
 ## Origin CLI
 
-Host the recursive agent on Origin as `allocations/Alpha-throttle-test`. Cloud / Origin agents clone and push there, not through a chat wrapper.
+Host the recursive agent on Origin as `ranjan-rgb/Alpha-throttle-test` (personal account, not allocations). Cloud / Origin agents clone and push there, not through a chat wrapper.
 
 ```bash
 npx tsx src/cli.ts origin-setup
@@ -114,7 +114,7 @@ That prints Kingsley's brief and the official Origin flow, adds remote `cursor-o
 ```bash
 curl -fsSL https://downloads.cursor.com/origin/install.sh | sh
 origin auth login
-origin repo create-mirrored 'ranjan2829/Alpha-throttle-test' --namespace allocations
+origin repo create-mirrored 'ranjan2829/Alpha-throttle-test' --namespace ranjan-rgb
 origin auth setup-git --local
 git push -u cursor-origin HEAD
 ```
@@ -122,9 +122,9 @@ git push -u cursor-origin HEAD
 Clone an existing Origin repo:
 
 ```bash
-origin repo clone 'allocations/Alpha-throttle-test'
+origin repo clone 'ranjan-rgb/Alpha-throttle-test'
 # or use git directly
-git clone 'https://origin.cursor.com/allocations/Alpha-throttle-test'
+git clone 'https://origin.cursor.com/ranjan-rgb/Alpha-throttle-test'
 ```
 
 If GitHub is already `origin`, keep it. The harness uses `cursor-origin` for Origin so ManagePullRequest / `gh` stay on GitHub.
@@ -191,7 +191,7 @@ npx tsx src/cli.ts throttle --throttle-after 2 --rate 4 --max 6 --episodes 2
 # Live proof. Without --max, live is capped at 3 PRs.
 # Pushes ticket branches. If gh cannot create the PR (integration token),
 # the outcome is still "opened" with a compare URL.
-npx tsx src/cli.ts throttle --live --rate 1 --max 3 --forge origin --repo allocations/Alpha-throttle-test
+npx tsx src/cli.ts throttle --live --rate 1 --max 3 --forge origin --repo ranjan-rgb/Alpha-throttle-test
 
 # Later saturation attempt (you raise the flags; the agent must not)
 npx tsx src/cli.ts throttle --live --rate 1000 --max 50 --concurrency 10

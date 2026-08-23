@@ -4,11 +4,11 @@ import { test } from "node:test";
 import { compareUrlFor, parseForgeFlag, parseRepoSlug } from "../src/throttle/forge.ts";
 
 test("parses Origin clone URL and slug", () => {
-  const fromUrl = parseRepoSlug("https://origin.cursor.com/allocations/Alpha-throttle-test", "origin");
-  assert.equal(fromUrl.slug, "allocations/Alpha-throttle-test");
-  assert.equal(fromUrl.httpsUrl, "https://origin.cursor.com/allocations/Alpha-throttle-test");
+  const fromUrl = parseRepoSlug("https://origin.cursor.com/ranjan-rgb/Alpha-throttle-test", "origin");
+  assert.equal(fromUrl.slug, "ranjan-rgb/Alpha-throttle-test");
+  assert.equal(fromUrl.httpsUrl, "https://origin.cursor.com/ranjan-rgb/Alpha-throttle-test");
   assert.equal(fromUrl.remote, "cursor-origin");
-  const fromSlug = parseRepoSlug("allocations/Alpha-throttle-test", "origin");
+  const fromSlug = parseRepoSlug("ranjan-rgb/Alpha-throttle-test", "origin");
   assert.deepEqual(fromUrl, fromSlug);
 });
 
@@ -20,10 +20,10 @@ test("parses GitHub repo for --forge github", () => {
 });
 
 test("Origin compare URLs stay on origin.cursor.com", () => {
-  const repo = parseRepoSlug("allocations/Alpha-throttle-test", "origin");
+  const repo = parseRepoSlug("ranjan-rgb/Alpha-throttle-test", "origin");
   assert.equal(
     compareUrlFor(repo, "main", "cursor/throttle-t1-ec34"),
-    "https://origin.cursor.com/allocations/Alpha-throttle-test/compare/main...cursor/throttle-t1-ec34",
+    "https://origin.cursor.com/ranjan-rgb/Alpha-throttle-test/compare/main...cursor/throttle-t1-ec34",
   );
 });
 

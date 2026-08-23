@@ -1,7 +1,11 @@
 export type ForgeKind = "origin" | "github";
 
-export const DEFAULT_ORIGIN_REPO = "allocations/Alpha-throttle-test";
+/** Personal Origin namespace. Not the allocations org. */
+export const DEFAULT_ORIGIN_NAMESPACE = "ranjan-rgb";
+/** Personal Origin home. Created by origin-setup after login. */
+export const DEFAULT_ORIGIN_REPO = `${DEFAULT_ORIGIN_NAMESPACE}/Alpha-throttle-test`;
 export const DEFAULT_GITHUB_MIRROR = "ranjan2829/Alpha-throttle-test";
+export const DEFAULT_ORIGIN_REPO_NAME = "Alpha-throttle-test";
 export const ORIGIN_GIT_HOST = "https://origin.cursor.com";
 export const ORIGIN_REMOTE = "cursor-origin";
 
