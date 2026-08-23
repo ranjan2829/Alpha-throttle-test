@@ -8,6 +8,7 @@ import { renderTree, runOrchestrator } from "./orchestrator.ts";
 import { decomposeGoal } from "./planner.ts";
 import { ensureWorkspace, loadPlan, loadState, savePlan, workspacePaths } from "./store.ts";
 import { createDryRunAdapter, createLiveAdapter, systemClock } from "./throttle/adapter.ts";
+import { DEFAULT_ORIGIN_REPO, parseForgeFlag, parseRepoSlug } from "./throttle/forge.ts";
 import { runThrottleLoop } from "./throttle/loop.ts";
 import { LIVE_DEFAULT_MAX, SAFE_POLICY } from "./throttle/types.ts";
 import { DEFAULT_BOUNDS, type AdapterKind, type Bounds } from "./types.ts";
@@ -184,11 +185,14 @@ async function commandThrottle(args: CliArgs): Promise<number> {
     lastUpdated: clock.now(),
     reason: live ? "cli --live" : "cli dry-run",
   };
+  const forge = parseForgeFlag(args.flags.get("forge"));
+  const repoFlag = args.flags.get("repo") ?? process.env.ALPHA_THROTTLE_REPO ?? DEFAULT_ORIGIN_REPO;
+  const forgeRepo = parseRepoSlug(repoFlag, forge);
   const adapter = live
     ? createLiveAdapter({
         clock,
         repoDir: process.cwd(),
-        ...remoteRepo(),
+        forgeRepo,
         baseBranch: args.flags.get("base") ?? "main",
       })
     : createDryRunAdapter({
@@ -199,7 +203,7 @@ async function commandThrottle(args: CliArgs): Promise<number> {
 
   if (live) {
     process.stdout.write(
-      `LIVE throttle: max=${maxPrsPerRun} rate=${rate}/s concurrency=${concurrency} (safe default max is ${LIVE_DEFAULT_MAX} unless --max is set)\n`,
+      `LIVE throttle (${forgeRepo.forge} ${forgeRepo.slug}): max=${maxPrsPerRun} rate=${rate}/s concurrency=${concurrency} (safe default max is ${LIVE_DEFAULT_MAX} unless --max is set)\n`,
     );
   } else {
     process.stdout.write(`dry-run throttle: max=${maxPrsPerRun} rate=${rate}/s concurrency=${concurrency}\n`);
@@ -217,6 +221,7 @@ async function commandThrottle(args: CliArgs): Promise<number> {
   });
   const report = {
     adapter: adapter.kind,
+    forge: live ? forgeRepo : { forge: "dry-run", slug: forgeRepo.slug },
     openedOrDry: result.openedOrDry,
     episodes: result.episodes.map((episode) => ({
       id: episode.id,
@@ -239,15 +244,6 @@ async function commandThrottle(args: CliArgs): Promise<number> {
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`workspace: ${workspace}\n`);
   return 0;
-}
-
-function remoteRepo(): { owner: string; repo: string } {
-  const url = process.env.ALPHA_THROTTLE_REPO ?? "https://github.com/ranjan2829/Alpha-throttle-test";
-  const match = url.match(/github\.com[:/]([^/]+)\/([^/.]+)/);
-  if (!match?.[1] || !match[2]) {
-    return { owner: "ranjan2829", repo: "Alpha-throttle-test" };
-  }
-  return { owner: match[1], repo: match[2] };
 }
 
 function boundsFromArgs(args: CliArgs): Bounds {
@@ -280,11 +276,12 @@ Usage:
   npx tsx src/cli.ts throttle [--workspace .alpha/throttle]
       [--rate 2] [--max 8] [--concurrency 2] [--episodes 3]
       [--throttle-after 0]
-  npx tsx src/cli.ts throttle --live --max 3 --rate 1
+  npx tsx src/cli.ts throttle --live --max 3 --rate 1 --forge origin
+      [--repo allocations/Alpha-throttle-test]
 
-Throttle defaults are SAFE (dry-run, no GitHub PRs). --live opens real PRs
-and defaults --max to 3 unless you pass --max. Saturation later:
-  npx tsx src/cli.ts throttle --live --rate 1000 --max 50 --concurrency 10
+Throttle defaults are SAFE (dry-run). --live opens real Origin changes
+(--forge origin, default) and caps --max at 3 unless you pass --max.
+  npx tsx src/cli.ts throttle --live --rate 1000 --max 50 --concurrency 10 --forge origin
 
 Adapters:
   local   run the leaf runner against isolated node directories (default; used by smoke)

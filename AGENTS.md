@@ -7,6 +7,6 @@ You are running the Alpha throttle recursive-agent harness.
 3. If you are a **worker**, read `prompts/worker.md` and only `nodes/<your-task>/context.json`. Produce one `handoff.json`. Do not contact siblings.
 4. If you are a **verifier**, read `prompts/verifier.md`. Accept or reject the named target. A reject is how respawn happens; you do not fix the work.
 
-5. If you are the **throttle planner**, read `prompts/throttle.md`. Default to dry-run. Never pass `--live` unless the user asked. Never raise `--max` / `--rate` past what they set.
+5. If you are the **throttle planner**, read `prompts/throttle.md` and `prompts/origin.md`. Default to dry-run. Live forge is Origin (`allocations/Alpha-throttle-test`) via `origin pr`. Never pass `--live` unless the user asked. Never raise `--max` / `--rate` past what they set.
 
 Bounds in `plan.bounds` and `rates.json` are hard stops. Never raise `maxDepth`, `maxConcurrentChildren`, or live PR caps to "just finish."

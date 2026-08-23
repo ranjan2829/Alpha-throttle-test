@@ -97,9 +97,45 @@ Workspace layout after a run:
     artifacts/
 ```
 
+## Origin CLI
+
+This repo lives on Origin as `allocations/Alpha-throttle-test`. Cloud / Origin agents clone and push here, not through a chat wrapper.
+
+```bash
+curl -fsSL https://downloads.cursor.com/origin/install.sh | sh
+origin auth login
+```
+
+Clone an existing repo:
+
+```bash
+origin repo clone 'allocations/Alpha-throttle-test'
+# or use git directly
+git clone 'https://origin.cursor.com/allocations/Alpha-throttle-test'
+```
+
+Push a local project:
+
+```bash
+git init -b 'main'
+git remote add origin 'https://origin.cursor.com/allocations/Alpha-throttle-test'
+git add .
+git commit -m "Initial commit"
+git push -u origin 'main'
+```
+
+If GitHub is already `origin`, add Origin as a second remote (the live adapter does this as `cursor-origin`):
+
+```bash
+git remote add cursor-origin 'https://origin.cursor.com/allocations/Alpha-throttle-test'
+origin auth setup-git --local
+```
+
+Live throttle uses `origin pr create` by default (`--forge origin`). `--forge github` is the fallback.
+
 ## Origin / cloud-agent usage
 
-On Cursor Origin or a cloud agent, treat this repo as the harness, not as a chat log.
+On Cursor Origin or a cloud agent, treat this repo as the harness, not as a chat log. See `prompts/origin.md`.
 
 **Root planner (you, if the user asked for a goal).** Read `prompts/root.md`. Own the goal. Do not implement the work yourself. Either:
 
@@ -155,7 +191,9 @@ npx tsx src/cli.ts throttle --workspace .alpha/throttle
 npx tsx src/cli.ts throttle --throttle-after 2 --rate 4 --max 6 --episodes 2
 
 # Live proof. Without --max, live is capped at 3 PRs.
-npx tsx src/cli.ts throttle --live --rate 1 --max 3
+# Pushes ticket branches. If gh cannot create the PR (integration token),
+# the outcome is still "opened" with a compare URL.
+npx tsx src/cli.ts throttle --live --rate 1 --max 3 --forge origin --repo allocations/Alpha-throttle-test
 
 # Later saturation attempt (you raise the flags; the agent must not)
 npx tsx src/cli.ts throttle --live --rate 1000 --max 50 --concurrency 10

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { compareUrlFor, type ForgeRepo } from "./forge.ts";
 import type { Clock, TicketOutcome, TicketSpec, ThrottleAdapterKind } from "./types.ts";
 
 export interface PrAdapter {
@@ -65,8 +66,7 @@ export function createDryRunAdapter(options: DryRunOptions): PrAdapter {
 export interface LiveAdapterOptions {
   clock: Clock;
   repoDir: string;
-  owner: string;
-  repo: string;
+  forgeRepo: ForgeRepo;
   baseBranch: string;
 }
 
@@ -96,7 +96,8 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
       try {
         const work = join(options.repoDir, ".alpha", "worktrees", ticket.ticketId);
         mkdirSync(join(options.repoDir, ".alpha", "worktrees"), { recursive: true });
-        await run(options.repoDir, ["git", "fetch", "origin", options.baseBranch]);
+        await ensureRemote(options.repoDir, options.forgeRepo);
+        const startPoint = await resolveStartPoint(options.repoDir, options.forgeRepo, options.baseBranch);
         await run(options.repoDir, [
           "git",
           "worktree",
@@ -104,29 +105,17 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
           "-B",
           ticket.branch,
           work,
-          `origin/${options.baseBranch}`,
+          startPoint,
         ]);
         mkdirSync(join(work, "tickets"), { recursive: true });
         writeFileSync(join(work, ticket.path), ticket.body, "utf8");
         await run(work, ["git", "add", ticket.path]);
         await run(work, ["git", "commit", "-m", ticket.title]);
-        await run(work, ["git", "push", "-u", "origin", ticket.branch]);
+        await run(work, ["git", "push", "-u", options.forgeRepo.remote, ticket.branch]);
         pushed = true;
-        const created = await run(work, [
-          "gh",
-          "pr",
-          "create",
-          "--base",
-          options.baseBranch,
-          "--head",
-          ticket.branch,
-          "--title",
-          ticket.title,
-          "--body",
-          `Throttle ticket ${ticket.ticketId}. Tiny one-line payload for the Alpha saturation harness.\n`,
-        ]);
-        const urlMatch = created.stdout.match(/https:\/\/github\.com\/\S+/);
-        const numberMatch = created.stdout.match(/\/pull\/(\d+)/);
+        const created = await createChange(work, options.forgeRepo, options.baseBranch, ticket);
+        const urlMatch = created.stdout.match(/https:\/\/(?:origin\.cursor\.com|github\.com)\/\S+/);
+        const numberMatch = created.stdout.match(/\/(?:pull|change|changes)\/(\d+)/);
         return {
           ticketId: ticket.ticketId,
           seq: ticket.seq,
@@ -149,44 +138,136 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
           status: classified.status,
           prNumber: null,
           prUrl: pushed
-            ? compareUrl(options.owner, options.repo, options.baseBranch, ticket.branch)
+            ? compareUrlFor(options.forgeRepo, options.baseBranch, ticket.branch)
             : null,
           httpStatus: classified.httpStatus,
           latencyMs: options.clock.nowMs() - started,
           mergeMs: null,
-          error: classified.status === "opened" ? "branch pushed; gh pr create forbidden for this token" : message,
+          error:
+            classified.status === "opened"
+              ? "branch pushed; PR create forbidden for this token — open via origin pr create or Cursor"
+              : message,
         };
       }
     },
     async observe(outcome: TicketOutcome): Promise<TicketOutcome> {
-      if (!outcome.prNumber) return outcome;
+      if (!outcome.prNumber && !outcome.branch) return outcome;
       try {
-        const viewed = await run(options.repoDir, [
-          "gh",
-          "pr",
-          "view",
-          String(outcome.prNumber),
-          "--json",
-          "state,mergedAt,url",
-        ]);
-        const parsed = JSON.parse(viewed.stdout) as {
-          state?: string;
-          mergedAt?: string | null;
-          url?: string;
-        };
-        if (parsed.state === "MERGED") {
-          return { ...outcome, status: "merged", prUrl: parsed.url ?? outcome.prUrl };
+        const viewed = await observeChange(options.repoDir, options.forgeRepo, outcome);
+        if (viewed.state === "MERGED" || viewed.state === "merged") {
+          return { ...outcome, status: "merged", prUrl: viewed.url ?? outcome.prUrl };
         }
-        if (parsed.state === "CLOSED") {
-          return { ...outcome, status: "rejected", prUrl: parsed.url ?? outcome.prUrl };
+        if (viewed.state === "CLOSED" || viewed.state === "closed") {
+          return { ...outcome, status: "rejected", prUrl: viewed.url ?? outcome.prUrl };
         }
-        return { ...outcome, status: "opened", prUrl: parsed.url ?? outcome.prUrl };
+        return { ...outcome, status: "opened", prUrl: viewed.url ?? outcome.prUrl };
       } catch (err) {
         const message = err instanceof Error ? err.message : "observe failed";
         return { ...outcome, error: message };
       }
     },
   };
+}
+
+async function ensureRemote(repoDir: string, forgeRepo: ForgeRepo): Promise<void> {
+  const remotes = await run(repoDir, ["git", "remote"]);
+  const names = remotes.stdout.split(/\s+/).filter((name) => name.length > 0);
+  if (!names.includes(forgeRepo.remote)) {
+    await run(repoDir, ["git", "remote", "add", forgeRepo.remote, forgeRepo.httpsUrl]);
+    return;
+  }
+  await run(repoDir, ["git", "remote", "set-url", forgeRepo.remote, forgeRepo.httpsUrl]);
+}
+
+async function resolveStartPoint(repoDir: string, forgeRepo: ForgeRepo, baseBranch: string): Promise<string> {
+  try {
+    await run(repoDir, ["git", "fetch", forgeRepo.remote, baseBranch]);
+    return `${forgeRepo.remote}/${baseBranch}`;
+  } catch {
+    await run(repoDir, ["git", "fetch", "origin", baseBranch]);
+    return `origin/${baseBranch}`;
+  }
+}
+
+async function createChange(
+  work: string,
+  forgeRepo: ForgeRepo,
+  baseBranch: string,
+  ticket: TicketSpec,
+): Promise<ProcResult> {
+  const body = `Throttle ticket ${ticket.ticketId}. Tiny one-line payload for the Alpha saturation harness.\n`;
+  if (forgeRepo.forge === "origin") {
+    return run(work, [
+      "origin",
+      "pr",
+      "create",
+      "-R",
+      forgeRepo.slug,
+      "--title",
+      ticket.title,
+      "--body",
+      body,
+      "--head",
+      ticket.branch,
+      "--base",
+      baseBranch,
+      "--status",
+      "open",
+      "--push",
+      "--remote",
+      forgeRepo.remote,
+    ]);
+  }
+  return run(work, [
+    "gh",
+    "pr",
+    "create",
+    "--base",
+    baseBranch,
+    "--head",
+    ticket.branch,
+    "--title",
+    ticket.title,
+    "--body",
+    body,
+  ]);
+}
+
+interface ObservedChange {
+  state: string | undefined;
+  url: string | undefined;
+}
+
+async function observeChange(
+  repoDir: string,
+  forgeRepo: ForgeRepo,
+  outcome: TicketOutcome,
+): Promise<ObservedChange> {
+  if (forgeRepo.forge === "origin") {
+    const target = outcome.prNumber ? String(outcome.prNumber) : outcome.branch;
+    const viewed = await run(repoDir, [
+      "origin",
+      "pr",
+      "view",
+      target,
+      "-R",
+      forgeRepo.slug,
+      "--json",
+      "number,status,url",
+    ]);
+    const parsed = JSON.parse(viewed.stdout) as { status?: string; url?: string };
+    return { state: parsed.status, url: parsed.url };
+  }
+  const viewed = await run(repoDir, [
+    "gh",
+    "pr",
+    "view",
+    String(outcome.prNumber),
+    "--json",
+    "state,mergedAt,url",
+  ]);
+  const parsed = JSON.parse(viewed.stdout) as { state?: string; url?: string };
+  return { state: parsed.state, url: parsed.url };
 }
 
 interface ProcResult {
