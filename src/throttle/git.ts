@@ -77,15 +77,29 @@ export async function commitAndPushUniqueFile(options: {
   return commit;
 }
 
-let writeChain: Promise<void> = Promise.resolve();
+/** Isolated GIT_INDEX_FILE per write; a small gate still avoids object-store stampedes. */
+const GIT_WRITE_CONCURRENCY = 8;
+let activeWrites = 0;
+const writeWaiters: Array<() => void> = [];
 
 function withGitWrite<T>(job: () => Promise<T>): Promise<T> {
-  const run = writeChain.then(job, job);
-  writeChain = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
+  const acquire = (): Promise<void> => {
+    if (activeWrites < GIT_WRITE_CONCURRENCY) {
+      activeWrites += 1;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      writeWaiters.push(resolve);
+    });
+  };
+  const release = (): void => {
+    const next = writeWaiters.shift();
+    if (next) next();
+    else activeWrites = Math.max(0, activeWrites - 1);
+  };
+  return acquire()
+    .then(job)
+    .finally(release);
 }
 
 export async function writeUniqueCommit(options: {

@@ -127,14 +127,14 @@ npm run smoke
 # dry-run — no PRs
 npx tsx src/cli.ts agent --max 16 --concurrency 8
 
-# live — keep going until 10k PRs merge (chunked)
-npx tsx src/cli.ts agent --live --until-merged 10000 --chunk 200 --concurrency 16 \
+# live — keep going until 100k PRs merge (chunked, resume-safe)
+npx tsx src/cli.ts agent --live --fast --until-merged 100000 --chunk 400 --concurrency 32 \
   --forge origin --repo allocations/Alpha-throttle-test
 ```
 
 Copy `.env.example` to `.env`. Never commit the key.
 
-Ticket commits and Origin squash merges are stamped **Ranjan S `<ranjan@allocations.com>`**. Override with `ALPHA_GIT_NAME` / `ALPHA_GIT_EMAIL`. PR author is whoever is logged into `origin auth` (same account).
+Ticket commits are **Ranjan S `<ranjan@allocations.com>`**. PRs are opened as the `origin auth` login (`ranjan@allocations.com`). Merges use a **merge commit**, not squash — Origin squash was rewriting the author to a Cursor noreply. Override commit identity with `ALPHA_GIT_NAME` / `ALPHA_GIT_EMAIL`.
 
 `--live` without `--max` / `--per-minute` caps at 3 PRs.
 

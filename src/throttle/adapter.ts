@@ -76,8 +76,12 @@ export interface LiveAdapterOptions {
   merge: boolean;
   /** Frozen main SHA for every open. Sibling PRs, no Origin stack. */
   startSha?: string;
-  /** Parallel squash-merges. Unique files make this safe; races retry. */
+  /** Parallel merge-commits. Unique files make this safe; races retry. */
   mergeConcurrency?: number;
+  /** This repo has no CI. Skip origin pr checks to keep merge volume up. */
+  skipChecks?: boolean;
+  /** Treat a successful merge command as merged; skip a follow-up pr view. */
+  trustMerge?: boolean;
 }
 
 export interface CheckRow {
@@ -211,7 +215,9 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
       }
       if (!outcome.prNumber && !outcome.branch) return outcome;
       try {
-        const checks = await readChecks(options.repoDir, options.forgeRepo, outcome);
+        const checks = options.skipChecks
+          ? { checkStatus: "none" as const, checkCount: 0 }
+          : await readChecks(options.repoDir, options.forgeRepo, outcome);
         const next: TicketOutcome = { ...outcome, ...checks };
         if (checks.checkStatus === "failure") {
           return { ...next, status: "rejected", error: "build failed" };
@@ -227,6 +233,13 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
               body: payloads.get(next.ticketId) ?? next.path,
             }),
           );
+          if (options.trustMerge) {
+            return {
+              ...next,
+              status: "merged",
+              mergeMs: options.clock.nowMs() - mergeStarted,
+            };
+          }
           const viewed = await observeChange(options.repoDir, options.forgeRepo, next);
           if (viewed.state === "MERGED" || viewed.state === "merged") {
             return {
@@ -463,17 +476,22 @@ async function restackOntoMain(options: {
   await clearOriginStack(options.repoDir, options.forgeRepo.slug, target);
 }
 
+/** Merge commit, not squash. Squash rewrites the author to Origin's noreply. */
+export function originMergeArgv(repo: string, target: string): string[] {
+  return ["origin", "pr", "merge", target, "-R", repo, "--merge"];
+}
+
 export async function mergeOriginPr(repoDir: string, repo: string, target: string): Promise<void> {
-  await runWithMergeRetry(repoDir, ["origin", "pr", "merge", target, "-R", repo, "--squash"]);
+  await runWithMergeRetry(repoDir, originMergeArgv(repo, target));
 }
 
 async function mergeChange(repoDir: string, forgeRepo: ForgeRepo, outcome: TicketOutcome): Promise<void> {
   const target = outcome.prNumber ? String(outcome.prNumber) : outcome.branch;
   const argv =
     forgeRepo.forge === "origin"
-      ? ["origin", "pr", "merge", target, "-R", forgeRepo.slug, "--squash"]
+      ? originMergeArgv(forgeRepo.slug, target)
       : outcome.prNumber
-        ? ["gh", "pr", "merge", String(outcome.prNumber), "--squash"]
+        ? ["gh", "pr", "merge", String(outcome.prNumber), "--merge"]
         : null;
   if (!argv) {
     throw new Error("cannot merge GitHub PR without a number");

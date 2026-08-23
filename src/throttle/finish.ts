@@ -33,6 +33,7 @@ export async function finishOpenOriginChanges(options: {
   repo: string;
   limit: number;
   concurrency: number;
+  skipChecks?: boolean;
 }): Promise<FinishResult> {
   const listed = await runJson(options.repoDir, [
     "origin",
@@ -56,7 +57,7 @@ export async function finishOpenOriginChanges(options: {
     while (running.size < options.concurrency && pending.length > 0) {
       const change = pending.shift();
       if (!change) break;
-      const job = finishOne(options.repoDir, options.repo, change)
+      const job = finishOne(options.repoDir, options.repo, change, options.skipChecks === true)
         .then((row) => {
           rows.push(row);
         })
@@ -85,19 +86,29 @@ export async function finishOpenOriginChanges(options: {
   };
 }
 
-async function finishOne(repoDir: string, repo: string, change: ListedChange): Promise<FinishRow> {
+async function finishOne(
+  repoDir: string,
+  repo: string,
+  change: ListedChange,
+  skipChecks: boolean,
+): Promise<FinishRow> {
   try {
-    const checked = await runText(repoDir, [
-      "origin",
-      "pr",
-      "checks",
-      String(change.number),
-      "-R",
-      repo,
-      "--json",
-      "id,name,status,conclusion,detailsUrl",
-    ]);
-    const summary = summarizeChecks(parseCheckRows(checked));
+    const summary = skipChecks
+      ? { checkStatus: "none" as const, checkCount: 0 }
+      : summarizeChecks(
+          parseCheckRows(
+            await runText(repoDir, [
+              "origin",
+              "pr",
+              "checks",
+              String(change.number),
+              "-R",
+              repo,
+              "--json",
+              "id,name,status,conclusion,detailsUrl",
+            ]),
+          ),
+        );
     if (summary.checkStatus === "failure") {
       return {
         number: change.number,

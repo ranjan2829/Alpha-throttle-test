@@ -8,7 +8,7 @@ export { readClaudeApiKey, deterministicBurstSplit, parseBurstSplit } from "./cl
 export { resolveAgentTarget, policyForAgentTarget } from "./agent.ts";
 export { createGate, parseCreatedChange, isMergeRace } from "./throttle/adapter.ts";
 export { learn, plannedBurst, summarizeOutcomes } from "./throttle/policy.ts";
-export { SAFE_POLICY, LIVE_DEFAULT_MAX } from "./throttle/types.ts";
+export { SAFE_POLICY, LIVE_DEFAULT_MAX, EXTREME_UNTIL_MERGED } from "./throttle/types.ts";
 export {
   parseRepoSlug,
   DEFAULT_ORIGIN_REPO,

@@ -98,3 +98,6 @@ export const SAFE_POLICY: RatePolicy = {
 };
 
 export const LIVE_DEFAULT_MAX = 3;
+
+/** Extreme live merge target. Pass --until-merged to raise or lower it. */
+export const EXTREME_UNTIL_MERGED = 100_000;

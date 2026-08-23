@@ -15,7 +15,7 @@ import { runOriginHost } from "./throttle/host.ts";
 import { runThrottleLoop } from "./throttle/loop.ts";
 import { finishOpenOriginChanges } from "./throttle/finish.ts";
 import { addCursorOriginRemote, originAuthStatus, originSetupText } from "./throttle/origin-cli.ts";
-import { LIVE_DEFAULT_MAX, SAFE_POLICY } from "./throttle/types.ts";
+import { EXTREME_UNTIL_MERGED, LIVE_DEFAULT_MAX, SAFE_POLICY } from "./throttle/types.ts";
 import { DEFAULT_BOUNDS, type AdapterKind, type Bounds } from "./types.ts";
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
@@ -188,6 +188,7 @@ async function commandAgent(args: CliArgs): Promise<number> {
 
 async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent: false }): Promise<number> {
   const live = args.switches.has("live");
+  const fast = args.switches.has("fast");
   const workspace =
     args.flags.get("workspace") ?? join(process.cwd(), ".alpha", mode.agent ? "agent" : "throttle");
   const maxDefault = live ? LIVE_DEFAULT_MAX : SAFE_POLICY.maxPrsPerRun;
@@ -195,15 +196,20 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
   const rate = args.flags.has("rate")
     ? floatFlag(args, "rate", SAFE_POLICY.currentRatePerSec)
     : SAFE_POLICY.currentRatePerSec;
-  const concurrency = args.flags.has("concurrency")
-    ? intFlag(args, "concurrency", SAFE_POLICY.concurrency)
-    : SAFE_POLICY.concurrency;
   const perMinute = args.flags.has("per-minute") ? intFlag(args, "per-minute", 0) : null;
   const untilMerged = args.flags.has("until-merged") ? intFlag(args, "until-merged", 0) : null;
+  const extreme = untilMerged !== null && untilMerged >= 10_000;
+  const concurrency = args.flags.has("concurrency")
+    ? intFlag(args, "concurrency", SAFE_POLICY.concurrency)
+    : mode.agent && live && extreme
+      ? 32
+      : SAFE_POLICY.concurrency;
   const chunk = args.flags.has("chunk")
     ? intFlag(args, "chunk", 200)
     : untilMerged !== null && untilMerged > 0
-      ? 200
+      ? extreme
+        ? 400
+        : 200
       : 0;
   const target = resolveAgentTarget({
     perMinute,
@@ -242,10 +248,12 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
     }
   }
   const merge = live && !args.switches.has("no-merge");
+  const skipChecks = fast || args.switches.has("skip-checks") || (live && forgeRepo.forge === "origin");
+  const trustMerge = fast || args.switches.has("trust-merge") || (live && forgeRepo.forge === "origin");
   const mergeConcurrency = intFlag(
     args,
     "merge-concurrency",
-    mode.agent && live ? Math.min(16, Math.max(4, target.concurrency)) : 1,
+    mode.agent && live ? Math.max(8, target.concurrency) : 1,
   );
   const sweep =
     live && merge && untilMerged !== null && untilMerged > 0
@@ -253,8 +261,9 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
           const finished = await finishOpenOriginChanges({
             repoDir: process.cwd(),
             repo: forgeRepo.slug,
-            limit: Math.max(chunk * 2, 50),
-            concurrency: Math.min(10, mergeConcurrency),
+            limit: Math.max(chunk * 2, 200),
+            concurrency: Math.max(8, Math.min(24, mergeConcurrency)),
+            skipChecks,
           });
           return finished.merged;
         }
@@ -267,6 +276,8 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
         baseBranch: args.flags.get("base") ?? "main",
         merge,
         mergeConcurrency,
+        skipChecks,
+        trustMerge,
       })
     : createDryRunAdapter({
         clock,
@@ -274,7 +285,7 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
         latencyMs: intFlag(args, "latency-ms", 0),
       });
 
-  const claude = claudeFromArgs(args);
+  const claude = fast ? null : claudeFromArgs(args);
   const planner = claude ? "claude" : "deterministic";
   if (mode.agent) {
     writeAgentTree(workspace, {
@@ -312,6 +323,7 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
     ...(untilMerged !== null && untilMerged > 0 ? { untilMerged } : {}),
     ...(chunk > 0 ? { chunk } : {}),
     ...(sweep ? { sweep } : {}),
+    compact: fast || extreme,
   });
   const compact = result.outcomes.length >= 100;
   const report = {
@@ -420,9 +432,9 @@ Usage:
   npx tsx src/cli.ts plan --goal "<goal>" --workspace .alpha/my-goal
   npx tsx src/cli.ts tree --workspace .alpha/my-goal
   npx tsx src/cli.ts smoke
-  npx tsx src/cli.ts agent [--live] [--per-minute 500] [--max 500]
-      [--until-merged 10000] [--chunk 200]
-      [--concurrency 16] [--forge origin]
+  npx tsx src/cli.ts agent [--live] [--fast] [--per-minute 500] [--max 500]
+      [--until-merged 100000] [--chunk 400]
+      [--concurrency 32] [--forge origin]
       [--repo allocations/Alpha-throttle-test]
   npx tsx src/cli.ts throttle [--workspace .alpha/throttle]
       [--rate 2] [--max 8] [--concurrency 2] [--episodes 3]
@@ -436,13 +448,15 @@ Usage:
 
 Recursive agent (Origin throttle test):
   export ANTHROPIC_API_KEY=sk-...
-  npx tsx src/cli.ts agent --live --until-merged 10000 --chunk 200 \\
-      --concurrency 16 --forge origin --repo allocations/Alpha-throttle-test
+  npx tsx src/cli.ts agent --live --fast --until-merged ${EXTREME_UNTIL_MERGED} --chunk 400 \\
+      --concurrency 32 --forge origin --repo allocations/Alpha-throttle-test
 
 Claude is optional. Without a key the same tree still splits; with a key
-Claude is the planner. Each leaf opens one unique-file PR, checks the
-build, then merges. 500/sec is not possible over Origin HTTP.
---until-merged 10000 keeps chunking until that many PRs merge.
+Claude is the planner. --fast skips Claude, checks, and extra PR views.
+Each leaf opens one unique-file PR then merge-commits (not squash).
+500/sec is not possible over Origin HTTP.
+--until-merged ${EXTREME_UNTIL_MERGED} keeps chunking until that many PRs merge.
+A rerun of the same --workspace resumes from progress.json.
 
 Throttle defaults are SAFE (dry-run). --live opens real Origin changes
 and caps --max at 3 unless you pass --max or --per-minute.

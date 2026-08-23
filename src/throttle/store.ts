@@ -1,11 +1,19 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { parseJsonObject } from "../json.ts";
+import { optionalString, parseJsonObject, requireInt } from "../json.ts";
 import { ensureWorkspace, saveHandoff, savePlan, type WorkspacePaths } from "../store.ts";
 import type { Handoff, Plan } from "../types.ts";
 import { parsePolicy } from "./policy.ts";
 import { SAFE_POLICY, type Episode, type RatePolicy, type TicketOutcome } from "./types.ts";
+
+export interface ProgressSnapshot {
+  merged: number;
+  untilMerged: number | null;
+  attempted: number;
+  sweptMerged: number;
+  episode: string;
+}
 
 export interface ThrottlePaths extends WorkspacePaths {
   rates: string;
@@ -67,4 +75,22 @@ export function persistPlanAndHandoffs(paths: ThrottlePaths, plan: Plan, handoff
   for (const handoff of handoffs) {
     saveHandoff(paths, handoff);
   }
+}
+
+export function loadProgress(root: string): ProgressSnapshot | null {
+  const path = join(root, "progress.json");
+  if (!existsSync(path)) return null;
+  const parsed = parseJsonObject(readFileSync(path, "utf8"), path);
+  const untilRaw = parsed.untilMerged;
+  return {
+    merged: requireInt(parsed, "merged", 0, 0),
+    untilMerged: typeof untilRaw === "number" && Number.isInteger(untilRaw) ? untilRaw : null,
+    attempted: requireInt(parsed, "attempted", 0, 0),
+    sweptMerged: requireInt(parsed, "sweptMerged", 0, 0),
+    episode: optionalString(parsed, "episode") ?? "",
+  };
+}
+
+export function saveProgress(root: string, snapshot: ProgressSnapshot): void {
+  writeFileSync(join(root, "progress.json"), `${JSON.stringify(snapshot, null, 2)}\n`);
 }

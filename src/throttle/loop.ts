@@ -11,8 +11,10 @@ import {
   appendEpisode,
   ensureThrottleWorkspace,
   loadPolicy,
+  loadProgress,
   persistPlanAndHandoffs,
   savePolicy,
+  saveProgress,
   writeOutcome,
   writeTicketArtifact,
   type ThrottlePaths,
@@ -43,6 +45,8 @@ export interface ThrottleRunOptions {
   chunk?: number;
   /** Optional sweep of leftover open PRs between episodes. Returns extra merges. */
   sweep?: () => Promise<number>;
+  /** Skip per-ticket disk artifacts so high merge volume is not I/O bound. */
+  compact?: boolean;
 }
 
 export interface ThrottleRunResult {
@@ -62,13 +66,16 @@ export async function runThrottleLoop(options: ThrottleRunOptions): Promise<Thro
   const runId = makeRunId(clock.nowMs());
   const episodes: Episode[] = [];
   const allOutcomes: TicketOutcome[] = [];
-  let seq = 0;
+  const prior = loadProgress(paths.root);
+  let seq = prior?.attempted ?? 0;
+  let priorMerged = prior?.merged ?? 0;
   let sweptMerged = 0;
   const untilMerged = options.untilMerged ?? null;
   const chunk = options.chunk ?? 0;
+  const compact = options.compact === true || (untilMerged !== null && untilMerged >= 1000);
 
   const mergedCount = (): number =>
-    allOutcomes.filter((item) => countsAsMerged(item, options.live)).length + sweptMerged;
+    priorMerged + allOutcomes.filter((item) => countsAsMerged(item, options.live)).length + sweptMerged;
 
   for (let episodeIndex = 0; episodeIndex < options.maxEpisodes; episodeIndex += 1) {
     if (untilMerged !== null && mergedCount() >= untilMerged) break;
@@ -99,6 +106,7 @@ export async function runThrottleLoop(options: ThrottleRunOptions): Promise<Thro
       maxDepth: options.maxDepth,
       paths,
       claude: options.claude ?? null,
+      compact,
     });
     const stats = summarizeOutcomes(outcomes);
     const next = learn(policy, stats, clock.now());
@@ -107,7 +115,9 @@ export async function runThrottleLoop(options: ThrottleRunOptions): Promise<Thro
       verifierHandoff(outcome),
     ]);
     const plan = burstPlan(tickets, policy);
-    persistPlanAndHandoffs(paths, plan, handoffs);
+    if (!compact) {
+      persistPlanAndHandoffs(paths, plan, handoffs);
+    }
     const episode: Episode = {
       id: `ep-${episodeIndex + 1}`,
       depth: 0,
@@ -115,37 +125,50 @@ export async function runThrottleLoop(options: ThrottleRunOptions): Promise<Thro
       finishedAt: clock.now(),
       adapter: options.adapter.kind,
       plannedBurst: burst,
-      outcomes,
+      outcomes: compact ? [] : outcomes,
       stats,
       policyBefore: policy,
       policyAfter: next,
-      handoffs,
+      handoffs: compact ? [] : handoffs,
     };
     appendEpisode(paths, episode);
     episodes.push(episode);
     allOutcomes.push(...outcomes);
     policy = next;
     savePolicy(paths, policy);
-    writeFileSync(join(paths.root, "last-episode.json"), `${JSON.stringify(episode, null, 2)}\n`);
     writeFileSync(
-      join(paths.root, "progress.json"),
+      join(paths.root, "last-episode.json"),
       `${JSON.stringify(
         {
-          merged: mergedCount(),
-          untilMerged,
-          attempted: allOutcomes.length,
-          sweptMerged,
-          episode: episode.id,
+          id: episode.id,
+          plannedBurst: burst,
+          stats,
+          policyAfter: next,
         },
         null,
         2,
       )}\n`,
     );
+    saveProgress(paths.root, {
+      merged: mergedCount(),
+      untilMerged,
+      attempted: (prior?.attempted ?? 0) + allOutcomes.length,
+      sweptMerged: (prior?.sweptMerged ?? 0) + sweptMerged,
+      episode: episode.id,
+    });
     if (options.sweep && (untilMerged === null || mergedCount() < untilMerged)) {
       sweptMerged += await options.sweep();
+      saveProgress(paths.root, {
+        merged: mergedCount(),
+        untilMerged,
+        attempted: (prior?.attempted ?? 0) + allOutcomes.length,
+        sweptMerged: (prior?.sweptMerged ?? 0) + sweptMerged,
+        episode: episode.id,
+      });
     }
     if (stats.throttled429 > 0 && options.live) {
-      break;
+      if (untilMerged === null) break;
+      await clock.sleep(2_000);
     }
   }
 
@@ -173,6 +196,7 @@ async function runBurst(args: {
   maxDepth: number;
   paths: ThrottlePaths;
   claude: ClaudeClient | null;
+  compact: boolean;
 }): Promise<TicketOutcome[]> {
   const split = args.claude
     ? await planBurstSplit({
@@ -198,11 +222,15 @@ async function runBurst(args: {
     while (running.size < args.concurrency && pending.length > 0) {
       const ticket = pending.shift();
       if (!ticket) break;
-      writeTicketArtifact(args.paths, ticket.path, ticket.body);
+      if (!args.compact) {
+        writeTicketArtifact(args.paths, ticket.path, ticket.body);
+      }
       const job = (async () => {
         const opened = await args.adapter.openTicket(ticket);
         const observed = await args.adapter.observe(opened);
-        writeOutcome(args.paths, observed);
+        if (!args.compact) {
+          writeOutcome(args.paths, observed);
+        }
         outcomes.push(observed);
       })().finally(() => {
         running.delete(ticket.ticketId);
