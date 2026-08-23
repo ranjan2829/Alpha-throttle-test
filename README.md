@@ -25,7 +25,7 @@ Author: Ranjan S `<ranjan@allocations.com>`
 
 ## How Claude works
 
-Claude does **not** write the tickets or merge the PRs. It only cuts the burst.
+Claude is the planner: it splits the goal into smaller slices, and each slice can split again until maxDepth.
 
 ```mermaid
 flowchart TD
