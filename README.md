@@ -27,25 +27,16 @@ Author: Ranjan S `<ranjan@allocations.com>`
 
 ```mermaid
 flowchart TD
-  subgraph plan [1 Claude plans]
-    A[Take a chunk of tickets] --> B[Claude Sonnet 5]
-    B --> C[JSON split]
-    C --> D{depth under 3?}
-    D -->|yes| B
-    D -->|no| E[Leaf]
-  end
-
-  subgraph work [2 Worker runs]
-    E --> F[Write unique file]
-    F --> G[Open Origin PR]
-    G --> H[Merge commit]
-    H --> I[Verifier accept or reject]
-    I -->|reject| F
-  end
-
-  subgraph loop [3 Repeat]
-    I -->|accept| J{Hit 10000 merges?}
-    J -->|no| A
-    J -->|yes| K[Stop]
-  end
+  A[1 chunk of tickets] --> B[2 Claude Sonnet 5]
+  B --> C[3 JSON split]
+  C --> D[4 child planners]
+  D --> E{5 depth under 3?}
+  E -->|yes| B
+  E -->|no| F[6 leaf worker]
+  F --> G[7 write unique file]
+  G --> H[8 open Origin PR]
+  H --> I[9 merge]
+  I --> J{10 hit 10000 merges?}
+  J -->|no| A
+  J -->|yes| K[11 stop]
 ```
