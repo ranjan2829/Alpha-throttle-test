@@ -10,6 +10,7 @@ import { ensureWorkspace, loadPlan, loadState, savePlan, workspacePaths } from "
 import { createDryRunAdapter, createLiveAdapter, systemClock } from "./throttle/adapter.ts";
 import { DEFAULT_ORIGIN_REPO, parseForgeFlag, parseRepoSlug } from "./throttle/forge.ts";
 import { runThrottleLoop } from "./throttle/loop.ts";
+import { addCursorOriginRemote, originAuthStatus, originSetupText } from "./throttle/origin-cli.ts";
 import { LIVE_DEFAULT_MAX, SAFE_POLICY } from "./throttle/types.ts";
 import { DEFAULT_BOUNDS, type AdapterKind, type Bounds } from "./types.ts";
 
@@ -28,6 +29,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return commandSmoke(args);
     case "throttle":
       return commandThrottle(args);
+    case "origin-setup":
+      return commandOriginSetup();
     case "help":
     case "--help":
     case "-h":
@@ -188,6 +191,14 @@ async function commandThrottle(args: CliArgs): Promise<number> {
   const forge = parseForgeFlag(args.flags.get("forge"));
   const repoFlag = args.flags.get("repo") ?? process.env.ALPHA_THROTTLE_REPO ?? DEFAULT_ORIGIN_REPO;
   const forgeRepo = parseRepoSlug(repoFlag, forge);
+  if (live && forgeRepo.forge === "origin") {
+    addCursorOriginRemote(process.cwd(), forgeRepo);
+    const auth = originAuthStatus();
+    if (!auth.ok) {
+      process.stderr.write(`${auth.detail}\n\n${originSetupText(forgeRepo.slug)}`);
+      return 2;
+    }
+  }
   const adapter = live
     ? createLiveAdapter({
         clock,
@@ -246,6 +257,16 @@ async function commandThrottle(args: CliArgs): Promise<number> {
   return 0;
 }
 
+function commandOriginSetup(): number {
+  const forgeRepo = parseRepoSlug(DEFAULT_ORIGIN_REPO, "origin");
+  const remote = addCursorOriginRemote(process.cwd(), forgeRepo);
+  const auth = originAuthStatus();
+  process.stdout.write(originSetupText(forgeRepo.slug));
+  process.stdout.write(`\n${remote}\n`);
+  process.stdout.write(`auth: ${auth.ok ? "ok" : "needed"} ${auth.detail}\n`);
+  return auth.ok ? 0 : 2;
+}
+
 function boundsFromArgs(args: CliArgs): Bounds {
   return {
     maxDepth: intFlag(args, "max-depth", DEFAULT_BOUNDS.maxDepth),
@@ -276,6 +297,7 @@ Usage:
   npx tsx src/cli.ts throttle [--workspace .alpha/throttle]
       [--rate 2] [--max 8] [--concurrency 2] [--episodes 3]
       [--throttle-after 0]
+  npx tsx src/cli.ts origin-setup
   npx tsx src/cli.ts throttle --live --max 3 --rate 1 --forge origin
       [--repo allocations/Alpha-throttle-test]
 
