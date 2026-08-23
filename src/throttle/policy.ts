@@ -62,6 +62,7 @@ export function summarizeOutcomes(outcomes: TicketOutcome[]): EpisodeStats {
   const rejected = outcomes.filter((item) => item.status === "rejected").length;
   const throttled429 = outcomes.filter((item) => item.status === "throttled" || item.httpStatus === 429).length;
   const errors = outcomes.filter((item) => item.status === "error").length;
+  const checkFailures = outcomes.filter((item) => item.checkStatus === "failure").length;
   const latencies = outcomes.map((item) => item.latencyMs);
   const merges = outcomes
     .map((item) => item.mergeMs)
@@ -75,6 +76,7 @@ export function summarizeOutcomes(outcomes: TicketOutcome[]): EpisodeStats {
     rejected,
     throttled429,
     errors,
+    checkFailures,
     avgLatencyMs: average(latencies),
     avgMergeMs: merges.length > 0 ? average(merges) : null,
   };
@@ -86,18 +88,23 @@ export function learn(policy: RatePolicy, stats: EpisodeStats, at: string): Rate
   const attempts = Math.max(1, stats.attempted);
   const errorRatio = (stats.errors + stats.throttled429) / attempts;
 
-  if (stats.throttled429 > 0 || errorRatio > 0.3) {
+  if (stats.throttled429 > 0 || errorRatio > 0.3 || stats.checkFailures > 0) {
     next.currentRatePerSec = clamp(
       policy.currentRatePerSec * policy.backoffMultiplier,
       policy.minRatePerSec,
       policy.maxRatePerSec,
     );
     next.concurrency = Math.max(1, policy.concurrency - 1);
-    next.reason = stats.throttled429 > 0 ? "backoff: 429/throttle" : "backoff: error ratio";
+    next.reason =
+      stats.throttled429 > 0
+        ? "backoff: 429/throttle"
+        : stats.checkFailures > 0
+          ? "backoff: build failed"
+          : "backoff: error ratio";
     return next;
   }
 
-  if (stats.attempted > 0 && stats.throttled429 === 0 && stats.errors === 0) {
+  if (stats.attempted > 0 && stats.throttled429 === 0 && stats.errors === 0 && stats.checkFailures === 0) {
     next.currentRatePerSec = clamp(
       policy.currentRatePerSec * policy.speedupMultiplier,
       policy.minRatePerSec,

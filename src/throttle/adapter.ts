@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { compareUrlFor, type ForgeRepo } from "./forge.ts";
-import type { Clock, TicketOutcome, TicketSpec, ThrottleAdapterKind } from "./types.ts";
+import type { CheckStatus, Clock, TicketOutcome, TicketSpec, ThrottleAdapterKind } from "./types.ts";
 
 export interface PrAdapter {
   readonly kind: ThrottleAdapterKind;
@@ -38,6 +38,8 @@ export function createDryRunAdapter(options: DryRunOptions): PrAdapter {
           httpStatus: 429,
           latencyMs,
           mergeMs: null,
+          checkStatus: "none",
+          checkCount: 0,
           error: "simulated 429 Too Many Requests",
         };
       }
@@ -51,6 +53,8 @@ export function createDryRunAdapter(options: DryRunOptions): PrAdapter {
         httpStatus: 200,
         latencyMs,
         mergeMs: options.latencyMs,
+        checkStatus: "success",
+        checkCount: 1,
         error: null,
       };
     },
@@ -68,6 +72,37 @@ export interface LiveAdapterOptions {
   repoDir: string;
   forgeRepo: ForgeRepo;
   baseBranch: string;
+  merge: boolean;
+}
+
+export interface CheckRow {
+  name?: string;
+  status?: string;
+  conclusion?: string;
+}
+
+export function summarizeChecks(rows: CheckRow[]): { checkStatus: CheckStatus; checkCount: number } {
+  if (rows.length === 0) {
+    return { checkStatus: "none", checkCount: 0 };
+  }
+  const blob = rows
+    .map((row) => `${row.status ?? ""} ${row.conclusion ?? ""}`)
+    .join(" ");
+  if (/fail/i.test(blob)) {
+    return { checkStatus: "failure", checkCount: rows.length };
+  }
+  if (/pending|queued|in_progress|running/i.test(blob)) {
+    return { checkStatus: "pending", checkCount: rows.length };
+  }
+  return { checkStatus: "success", checkCount: rows.length };
+}
+
+export function parseCheckRows(text: string): CheckRow[] {
+  const parsed: unknown = JSON.parse(text);
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+  return parsed.filter((row): row is CheckRow => typeof row === "object" && row !== null);
 }
 
 export function compareUrl(owner: string, repo: string, base: string, head: string): string {
@@ -128,6 +163,8 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
           httpStatus: 201,
           latencyMs: options.clock.nowMs() - started,
           mergeMs: null,
+          checkStatus: "none",
+          checkCount: 0,
           error: null,
         };
       } catch (err) {
@@ -145,6 +182,8 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
           httpStatus: classified.httpStatus,
           latencyMs: options.clock.nowMs() - started,
           mergeMs: null,
+          checkStatus: "none",
+          checkCount: 0,
           error:
             classified.status === "opened"
               ? "branch pushed; PR create forbidden for this token — open via origin pr create or Cursor"
@@ -153,16 +192,44 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
       }
     },
     async observe(outcome: TicketOutcome): Promise<TicketOutcome> {
+      if (outcome.status === "throttled" || outcome.status === "error") {
+        return outcome;
+      }
       if (!outcome.prNumber && !outcome.branch) return outcome;
       try {
-        const viewed = await observeChange(options.repoDir, options.forgeRepo, outcome);
+        const checks = await readChecks(options.repoDir, options.forgeRepo, outcome);
+        const next: TicketOutcome = { ...outcome, ...checks };
+        if (checks.checkStatus === "failure") {
+          return { ...next, status: "rejected", error: "build failed" };
+        }
+        if (options.merge && next.status === "opened") {
+          const mergeStarted = options.clock.nowMs();
+          await mergeChange(options.repoDir, options.forgeRepo, next);
+          const viewed = await observeChange(options.repoDir, options.forgeRepo, next);
+          if (viewed.state === "MERGED" || viewed.state === "merged") {
+            return {
+              ...next,
+              status: "merged",
+              prUrl: viewed.url ?? next.prUrl,
+              mergeMs: options.clock.nowMs() - mergeStarted,
+            };
+          }
+          return {
+            ...next,
+            status: "error",
+            prUrl: viewed.url ?? next.prUrl,
+            mergeMs: options.clock.nowMs() - mergeStarted,
+            error: `merge did not complete: ${viewed.state ?? "unknown"}`,
+          };
+        }
+        const viewed = await observeChange(options.repoDir, options.forgeRepo, next);
         if (viewed.state === "MERGED" || viewed.state === "merged") {
-          return { ...outcome, status: "merged", prUrl: viewed.url ?? outcome.prUrl };
+          return { ...next, status: "merged", prUrl: viewed.url ?? next.prUrl };
         }
         if (viewed.state === "CLOSED" || viewed.state === "closed") {
-          return { ...outcome, status: "rejected", prUrl: viewed.url ?? outcome.prUrl };
+          return { ...next, status: "rejected", prUrl: viewed.url ?? next.prUrl };
         }
-        return { ...outcome, status: "opened", prUrl: viewed.url ?? outcome.prUrl };
+        return { ...next, status: "opened", prUrl: viewed.url ?? next.prUrl };
       } catch (err) {
         const message = err instanceof Error ? err.message : "observe failed";
         return { ...outcome, error: message };
@@ -233,6 +300,59 @@ async function createChange(
     "--body",
     body,
   ]);
+}
+
+async function readChecks(
+  repoDir: string,
+  forgeRepo: ForgeRepo,
+  outcome: TicketOutcome,
+): Promise<{ checkStatus: CheckStatus; checkCount: number }> {
+  const target = outcome.prNumber ? String(outcome.prNumber) : outcome.branch;
+  try {
+    if (forgeRepo.forge === "origin") {
+      const checked = await run(repoDir, [
+        "origin",
+        "pr",
+        "checks",
+        target,
+        "-R",
+        forgeRepo.slug,
+        "--json",
+        "id,name,status,conclusion,detailsUrl",
+      ]);
+      return summarizeChecks(parseCheckRows(checked.stdout));
+    }
+    if (!outcome.prNumber) {
+      return { checkStatus: "none", checkCount: 0 };
+    }
+    const checked = await run(repoDir, [
+      "gh",
+      "pr",
+      "checks",
+      String(outcome.prNumber),
+      "--json",
+      "name,state,conclusion",
+    ]);
+    return summarizeChecks(parseCheckRows(checked.stdout));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "checks failed";
+    if (/no checks|not found|without checks/i.test(message)) {
+      return { checkStatus: "none", checkCount: 0 };
+    }
+    return { checkStatus: "error", checkCount: 0 };
+  }
+}
+
+async function mergeChange(repoDir: string, forgeRepo: ForgeRepo, outcome: TicketOutcome): Promise<void> {
+  const target = outcome.prNumber ? String(outcome.prNumber) : outcome.branch;
+  if (forgeRepo.forge === "origin") {
+    await run(repoDir, ["origin", "pr", "merge", target, "-R", forgeRepo.slug, "--squash"]);
+    return;
+  }
+  if (!outcome.prNumber) {
+    throw new Error("cannot merge GitHub PR without a number");
+  }
+  await run(repoDir, ["gh", "pr", "merge", String(outcome.prNumber), "--squash"]);
 }
 
 interface ObservedChange {

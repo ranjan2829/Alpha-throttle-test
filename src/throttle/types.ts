@@ -4,6 +4,8 @@ export type ThrottleAdapterKind = "dry-run" | "live";
 
 export type TicketStatus = "dry-run" | "opened" | "merged" | "rejected" | "throttled" | "error";
 
+export type CheckStatus = "none" | "success" | "failure" | "pending" | "error";
+
 export interface RatePolicy {
   version: 1;
   /** Saturation goal to measure against, not a promise. */
@@ -40,6 +42,8 @@ export interface TicketOutcome {
   httpStatus: number | null;
   latencyMs: number;
   mergeMs: number | null;
+  checkStatus: CheckStatus;
+  checkCount: number;
   error: string | null;
 }
 
@@ -52,6 +56,7 @@ export interface EpisodeStats {
   rejected: number;
   throttled429: number;
   errors: number;
+  checkFailures: number;
   avgLatencyMs: number;
   avgMergeMs: number | null;
 }

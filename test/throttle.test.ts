@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { classifyLiveFailure, createDryRunAdapter } from "../src/throttle/adapter.ts";
+import { classifyLiveFailure, createDryRunAdapter, summarizeChecks } from "../src/throttle/adapter.ts";
 import { runThrottleLoop } from "../src/throttle/loop.ts";
 import { learn, plannedBurst, shouldSplitBurst, summarizeOutcomes } from "../src/throttle/policy.ts";
 import { SAFE_POLICY, type Clock, type RatePolicy, type TicketOutcome } from "../src/throttle/types.ts";
@@ -38,6 +38,17 @@ test("learn backs off rate and concurrency on 429", () => {
   assert.equal(after.currentRatePerSec, 4);
   assert.equal(after.concurrency, 3);
   assert.match(after.reason, /backoff/);
+});
+
+test("learn backs off when a build fails", () => {
+  const before = policy({ currentRatePerSec: 8, concurrency: 4 });
+  const stats = summarizeOutcomes([
+    outcome({ status: "rejected", checkStatus: "failure", checkCount: 1 }),
+    outcome({ status: "opened" }),
+  ]);
+  const after = learn(before, stats, "2026-01-01T00:00:00.000Z");
+  assert.equal(after.currentRatePerSec, 4);
+  assert.match(after.reason, /build failed/);
 });
 
 test("learn speeds up on a clean burst", () => {
@@ -129,7 +140,25 @@ function outcome(partial: Partial<TicketOutcome>): TicketOutcome {
     httpStatus: 200,
     latencyMs: 1,
     mergeMs: null,
+    checkStatus: "none",
+    checkCount: 0,
     error: null,
     ...partial,
   };
 }
+
+test("summarizeChecks treats empty as none and failures as failure", () => {
+  assert.deepEqual(summarizeChecks([]), { checkStatus: "none", checkCount: 0 });
+  assert.deepEqual(summarizeChecks([{ name: "ci", status: "completed", conclusion: "success" }]), {
+    checkStatus: "success",
+    checkCount: 1,
+  });
+  assert.deepEqual(summarizeChecks([{ name: "ci", status: "completed", conclusion: "failure" }]), {
+    checkStatus: "failure",
+    checkCount: 1,
+  });
+  assert.deepEqual(summarizeChecks([{ name: "ci", status: "in_progress" }]), {
+    checkStatus: "pending",
+    checkCount: 1,
+  });
+});

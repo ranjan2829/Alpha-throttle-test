@@ -11,6 +11,7 @@ import { createDryRunAdapter, createLiveAdapter, systemClock } from "./throttle/
 import { DEFAULT_GITHUB_MIRROR, DEFAULT_ORIGIN_REPO, parseForgeFlag, parseRepoSlug } from "./throttle/forge.ts";
 import { runOriginHost } from "./throttle/host.ts";
 import { runThrottleLoop } from "./throttle/loop.ts";
+import { finishOpenOriginChanges } from "./throttle/finish.ts";
 import { addCursorOriginRemote, originAuthStatus, originSetupText } from "./throttle/origin-cli.ts";
 import { LIVE_DEFAULT_MAX, SAFE_POLICY } from "./throttle/types.ts";
 import { DEFAULT_BOUNDS, type AdapterKind, type Bounds } from "./types.ts";
@@ -32,6 +33,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return commandThrottle(args);
     case "origin-setup":
       return commandOriginSetup(args);
+    case "origin-finish":
+      return commandOriginFinish(args);
     case "help":
     case "--help":
     case "-h":
@@ -201,12 +204,14 @@ async function commandThrottle(args: CliArgs): Promise<number> {
       return 2;
     }
   }
+  const merge = live && !args.switches.has("no-merge");
   const adapter = live
     ? createLiveAdapter({
         clock,
         repoDir: process.cwd(),
         forgeRepo,
         baseBranch: args.flags.get("base") ?? "main",
+        merge,
       })
     : createDryRunAdapter({
         clock,
@@ -251,12 +256,27 @@ async function commandThrottle(args: CliArgs): Promise<number> {
       httpStatus: item.httpStatus,
       prUrl: item.prUrl,
       latencyMs: item.latencyMs,
+      mergeMs: item.mergeMs,
+      checkStatus: item.checkStatus,
+      checkCount: item.checkCount,
     })),
   };
   writeFileSync(join(workspace, "throttle-report.json"), `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`workspace: ${workspace}\n`);
   return 0;
+}
+
+async function commandOriginFinish(args: CliArgs): Promise<number> {
+  const repo = args.flags.get("repo") ?? process.env.ALPHA_THROTTLE_REPO ?? "allocations/Alpha-throttle-test";
+  const result = await finishOpenOriginChanges({
+    repoDir: process.cwd(),
+    repo,
+    limit: intFlag(args, "limit", 100),
+    concurrency: intFlag(args, "concurrency", 10),
+  });
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  return result.errors > 0 || result.buildFailed > 0 ? 1 : 0;
 }
 
 function commandOriginSetup(args: CliArgs): number {
@@ -305,8 +325,10 @@ Usage:
       [--throttle-after 0]
   npx tsx src/cli.ts origin-setup [--repo ranjan-rgb/Alpha-throttle-test]
       [--github ranjan2829/Alpha-throttle-test] [--no-push]
+  npx tsx src/cli.ts origin-finish [--repo allocations/Alpha-throttle-test]
+      [--limit 100] [--concurrency 10]
   npx tsx src/cli.ts throttle --live --max 3 --rate 1 --forge origin
-      [--repo ranjan-rgb/Alpha-throttle-test]
+      [--repo allocations/Alpha-throttle-test] [--no-merge]
 
 Throttle defaults are SAFE (dry-run). --live opens real Origin changes
 (--forge origin, default) and caps --max at 3 unless you pass --max.
