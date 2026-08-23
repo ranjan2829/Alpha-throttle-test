@@ -6,11 +6,11 @@ Recursive agent on Cursor Origin. Repo: `ranjan2829/Alpha-throttle-test`.
 
 ## Stats
 
-Live Origin run · 23 Aug 2026 · still going · target **100 000** merged
+Live Origin run · 23 Aug 2026 · target **10 000** merged · still going
 
 | tried | opened | merged | errors | 429s | time | merged / min |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 6 000 | 5 770 | **5 681** | 230 | **0** | 38 min | **148** |
+| 6 800 | 6 542 | **6 457** | 258 | **0** | 45 min | **143** |
 
 Latest merged PR: [#6964](https://cursor.com/codebase/allocations/Alpha-throttle-test/pull/6964)
 
@@ -38,7 +38,7 @@ flowchart LR
   W[worker] --> F[one unique file]
   F --> PR[open Origin PR]
   PR --> M[merge]
-  M --> L{merged 100000?}
+  M --> L{merged 10000?}
   L -->|no| W
   L -->|yes| S[stop]
 ```
