@@ -10,14 +10,14 @@ Live Origin run · 23 Aug 2026 · **stopped** · target was 10 000
 
 | tried | PRs opened | merged | errors | 429s | time |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 8 800 | 8 418 | **8 460** | 382 | **0** | 57 min |
+| 10 000 | 9 528 | **9 671** | 472 | **0** | 68 min |
 
 | speed | per second | per minute |
 | --- | ---: | ---: |
-| PRs opened | **2.45** | **147** |
-| merged | **2.46** | **148** |
+| PRs opened | **2.35** | **141** |
+| merged | **2.38** | **143** |
 
-Latest merged PR: [#10088](https://cursor.com/codebase/allocations/Alpha-throttle-test/pull/10088)
+Latest merged PR: [#11517](https://cursor.com/codebase/allocations/Alpha-throttle-test/pull/11517)
 
 Author: Ranjan S `<ranjan@allocations.com>`
 
