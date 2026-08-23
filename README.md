@@ -10,7 +10,7 @@ Live Origin run · 23 Aug 2026 · **stopped** · target was 10 000
 
 | tried | PRs opened | merged | errors | 429s | time |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 10 000 | 9 528 | **9 671** | 472 | **0** | 68 min |
+| 10 000 | 10 000 | **10 000** | 472 | **0** | 68 min |
 
 | speed | per second | per minute |
 | --- | ---: | ---: |
