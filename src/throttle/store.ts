@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { optionalString, parseJsonObject, requireInt } from "../json.ts";
 import { ensureWorkspace, saveHandoff, savePlan, type WorkspacePaths } from "../store.ts";
 import type { Handoff, Plan } from "../types.ts";
+import type { BurstSplit } from "../claude.ts";
 import { parsePolicy } from "./policy.ts";
 import { SAFE_POLICY, type Episode, type RatePolicy, type TicketOutcome } from "./types.ts";
 
@@ -93,4 +94,11 @@ export function loadProgress(root: string): ProgressSnapshot | null {
 
 export function saveProgress(root: string, snapshot: ProgressSnapshot): void {
   writeFileSync(join(root, "progress.json"), `${JSON.stringify(snapshot, null, 2)}\n`);
+}
+
+export function appendPlannerSplit(
+  root: string,
+  entry: BurstSplit & { depth: number; ticketCount: number },
+): void {
+  appendFileSync(join(root, "claude-splits.jsonl"), `${JSON.stringify(entry)}\n`);
 }

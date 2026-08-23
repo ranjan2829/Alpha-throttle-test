@@ -206,6 +206,11 @@ test("dry-run loop uses a Claude split then still writes dry-run outcomes", asyn
   });
   assert.equal(result.outcomes.length, 8);
   assert.ok(result.outcomes.every((item) => item.status === "dry-run"));
+  const splits = readFileSync(join(workspace, "claude-splits.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as { planner: string; parts: number[] });
+  assert.ok(splits.some((row) => row.planner === "claude" && row.parts[0] === 5 && row.parts[1] === 3));
 });
 
 test("dry-run loop does not open GitHub PRs and writes rates.json", async () => {

@@ -37,15 +37,39 @@ test("readClaudeApiKey prefers ANTHROPIC_API_KEY", () => {
 });
 
 test("deterministicBurstSplit is the recursive cut", () => {
-  assert.deepEqual(deterministicBurstSplit(8, 0, 3), { kind: "parts", parts: [4, 4] });
-  assert.deepEqual(deterministicBurstSplit(5, 0, 3), { kind: "parts", parts: [3, 2] });
-  assert.deepEqual(deterministicBurstSplit(3, 0, 3), { kind: "leaf", parts: [3] });
-  assert.deepEqual(deterministicBurstSplit(8, 2, 3), { kind: "leaf", parts: [8] });
+  assert.deepEqual(deterministicBurstSplit(8, 0, 3), {
+    kind: "parts",
+    parts: [4, 4],
+    planner: "deterministic",
+  });
+  assert.deepEqual(deterministicBurstSplit(5, 0, 3), {
+    kind: "parts",
+    parts: [3, 2],
+    planner: "deterministic",
+  });
+  assert.deepEqual(deterministicBurstSplit(3, 0, 3), {
+    kind: "leaf",
+    parts: [3],
+    planner: "deterministic",
+  });
+  assert.deepEqual(deterministicBurstSplit(8, 2, 3), {
+    kind: "leaf",
+    parts: [8],
+    planner: "deterministic",
+  });
 });
 
 test("parseBurstSplit reads Claude JSON and rejects bad sums", () => {
-  assert.deepEqual(parseBurstSplit('{"kind":"parts","parts":[3,2]}', 5), { kind: "parts", parts: [3, 2] });
-  assert.deepEqual(parseBurstSplit("```json\n{\"kind\":\"leaf\"}\n```", 4), { kind: "leaf", parts: [4] });
+  assert.deepEqual(parseBurstSplit('{"kind":"parts","parts":[3,2]}', 5), {
+    kind: "parts",
+    parts: [3, 2],
+    planner: "claude",
+  });
+  assert.deepEqual(parseBurstSplit("```json\n{\"kind\":\"leaf\"}\n```", 4), {
+    kind: "leaf",
+    parts: [4],
+    planner: "claude",
+  });
   assert.throws(() => parseBurstSplit('{"kind":"parts","parts":[1,1]}', 5), /sum/);
 });
 
@@ -54,13 +78,13 @@ test("planBurstSplit uses Claude then falls back", async () => {
     complete: async () => '{"kind":"parts","parts":[6,2]}',
   };
   const split = await planBurstSplit({ claude, ticketCount: 8, depth: 0, maxDepth: 3 });
-  assert.deepEqual(split, { kind: "parts", parts: [6, 2] });
+  assert.deepEqual(split, { kind: "parts", parts: [6, 2], planner: "claude" });
 
   const broken = {
     complete: async () => "not json",
   };
   const fallback = await planBurstSplit({ claude: broken, ticketCount: 8, depth: 0, maxDepth: 3 });
-  assert.deepEqual(fallback, { kind: "parts", parts: [4, 4] });
+  assert.deepEqual(fallback, { kind: "parts", parts: [4, 4], planner: "deterministic" });
 });
 
 test("sliceTickets follows Claude parts", () => {

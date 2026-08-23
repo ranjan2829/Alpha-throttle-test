@@ -1,14 +1,14 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { ClaudeClient } from "../claude.ts";
-import { deterministicBurstSplit, planBurstSplit } from "../claude.ts";
+import { planBurstSplit, type ClaudeClient } from "../claude.ts";
 import type { Handoff, Plan, PlanTask } from "../types.ts";
 import { DEFAULT_BOUNDS } from "../types.ts";
 import type { PrAdapter } from "./adapter.ts";
 import { learn, plannedBurst, summarizeOutcomes } from "./policy.ts";
 import {
   appendEpisode,
+  appendPlannerSplit,
   ensureThrottleWorkspace,
   loadPolicy,
   loadProgress,
@@ -198,14 +198,19 @@ async function runBurst(args: {
   claude: ClaudeClient | null;
   compact: boolean;
 }): Promise<TicketOutcome[]> {
-  const split = args.claude
-    ? await planBurstSplit({
-        claude: args.claude,
-        ticketCount: args.tickets.length,
-        depth: args.depth,
-        maxDepth: args.maxDepth,
-      })
-    : deterministicBurstSplit(args.tickets.length, args.depth, args.maxDepth);
+  const split = await planBurstSplit({
+    claude: args.claude,
+    ticketCount: args.tickets.length,
+    depth: args.depth,
+    maxDepth: args.maxDepth,
+  });
+  appendPlannerSplit(args.paths.root, {
+    kind: split.kind,
+    parts: split.parts,
+    planner: split.planner,
+    depth: args.depth,
+    ticketCount: args.tickets.length,
+  });
   if (split.kind === "parts") {
     const slices = sliceTickets(args.tickets, split.parts);
     const childOutcomes = await Promise.all(

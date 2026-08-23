@@ -286,6 +286,10 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
       });
 
   const claude = fast ? null : claudeFromArgs(args);
+  if (mode.agent && live && !fast && !claude) {
+    process.stderr.write("live agent requires ANTHROPIC_API_KEY (or pass --fast)\n");
+    return 2;
+  }
   const planner = claude ? "claude" : "deterministic";
   if (mode.agent) {
     writeAgentTree(workspace, {
@@ -294,8 +298,10 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
       maxDepth: intFlag(args, "max-depth", 3),
       tickets: target.maxPrs,
       note: claude
-        ? "Claude splits the burst; leaf workers open unique Origin PRs, check builds, merge."
-        : "No ANTHROPIC_API_KEY yet. Same recursive split, deterministic planner. Paste the key and rerun.",
+        ? "Claude splits each burst; leaf workers open unique Origin PRs and merge."
+        : fast
+          ? "--fast: deterministic split, no Claude."
+          : "No ANTHROPIC_API_KEY yet. Same recursive split, deterministic planner. Paste the key and rerun.",
     });
   }
 
@@ -448,13 +454,13 @@ Usage:
 
 Recursive agent (Origin throttle test):
   export ANTHROPIC_API_KEY=sk-...
-  npx tsx src/cli.ts agent --live --fast --until-merged ${EXTREME_UNTIL_MERGED} --chunk 400 \\
+  npx tsx src/cli.ts agent --live --until-merged ${EXTREME_UNTIL_MERGED} --chunk 400 \\
       --concurrency 32 --forge origin --repo allocations/Alpha-throttle-test
 
-Claude is optional. Without a key the same tree still splits; with a key
-Claude is the planner. --fast skips Claude, checks, and extra PR views.
-Each leaf opens one unique-file PR then merge-commits (not squash).
-500/sec is not possible over Origin HTTP.
+Claude is the planner when ANTHROPIC_API_KEY is set. Live agent requires
+the key unless you pass --fast (deterministic split only). Each split is
+appended to claude-splits.jsonl. Leaves open one unique-file PR then
+merge-commit (not squash). 500/sec is not possible over Origin HTTP.
 --until-merged ${EXTREME_UNTIL_MERGED} keeps chunking until that many PRs merge.
 A rerun of the same --workspace resumes from progress.json.
 

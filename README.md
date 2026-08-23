@@ -127,8 +127,8 @@ npm run smoke
 # dry-run — no PRs
 npx tsx src/cli.ts agent --max 16 --concurrency 8
 
-# live — keep going until 100k PRs merge (chunked, resume-safe)
-npx tsx src/cli.ts agent --live --fast --until-merged 100000 --chunk 400 --concurrency 32 \
+# live — Claude plans the splits; keep going until 100k PRs merge
+npx tsx src/cli.ts agent --live --until-merged 100000 --chunk 400 --concurrency 32 \
   --forge origin --repo allocations/Alpha-throttle-test
 ```
 

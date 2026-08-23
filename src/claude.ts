@@ -24,9 +24,12 @@ export interface ClaudeCompleteOptions {
   fetchImpl?: typeof fetch;
 }
 
+export type BurstPlanner = "claude" | "deterministic";
+
 export interface BurstSplit {
   kind: "leaf" | "parts";
   parts: number[];
+  planner: BurstPlanner;
 }
 
 export function loadDotEnv(
@@ -149,7 +152,7 @@ export function parseBurstSplit(text: string, ticketCount: number): BurstSplit {
   const obj = parseJsonObject(stripJsonFence(text), "claude-split");
   const kind = obj.kind;
   if (kind === "leaf") {
-    return { kind: "leaf", parts: [ticketCount] };
+    return { kind: "leaf", parts: [ticketCount], planner: "claude" };
   }
   if (kind !== "parts") {
     throw new Error("claude-split kind must be leaf | parts");
@@ -169,7 +172,7 @@ export function parseBurstSplit(text: string, ticketCount: number): BurstSplit {
   if (sum !== ticketCount) {
     throw new Error(`claude-split parts sum ${sum} != ticketCount ${ticketCount}`);
   }
-  return { kind: "parts", parts };
+  return { kind: "parts", parts, planner: "claude" };
 }
 
 export function deterministicBurstSplit(
@@ -178,10 +181,10 @@ export function deterministicBurstSplit(
   maxDepth: number,
 ): BurstSplit {
   if (ticketCount < 4 || depth + 1 >= maxDepth) {
-    return { kind: "leaf", parts: [ticketCount] };
+    return { kind: "leaf", parts: [ticketCount], planner: "deterministic" };
   }
   const mid = Math.ceil(ticketCount / 2);
-  return { kind: "parts", parts: [mid, ticketCount - mid] };
+  return { kind: "parts", parts: [mid, ticketCount - mid], planner: "deterministic" };
 }
 
 export async function planBurstSplit(options: {
@@ -205,7 +208,7 @@ export async function planBurstSplit(options: {
         'If you should not split, return {"kind":"leaf"}.',
       ].join("\n"),
     );
-    return parseBurstSplit(text, options.ticketCount);
+    return { ...parseBurstSplit(text, options.ticketCount), planner: "claude" };
   } catch {
     return fallback;
   }
