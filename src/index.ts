@@ -13,7 +13,7 @@ export {
   DEFAULT_GITHUB_MIRROR,
 } from "./throttle/forge.ts";
 export { runOriginHost, originHostPlan, originHostText } from "./throttle/host.ts";
-export { KINGSLEY_BRIEF, kingsleyBriefText } from "./throttle/brief.ts";
+export { PRODUCT_BRIEF, productBriefText } from "./throttle/brief.ts";
 export type {
   AdapterKind,
   Bounds,
