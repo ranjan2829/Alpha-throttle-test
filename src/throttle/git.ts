@@ -77,7 +77,28 @@ export async function commitAndPushUniqueFile(options: {
   return commit;
 }
 
+let writeChain: Promise<void> = Promise.resolve();
+
+function withGitWrite<T>(job: () => Promise<T>): Promise<T> {
+  const run = writeChain.then(job, job);
+  writeChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 export async function writeUniqueCommit(options: {
+  repoDir: string;
+  parentSha: string;
+  path: string;
+  body: string;
+  message: string;
+}): Promise<string> {
+  return withGitWrite(() => writeUniqueCommitUnlocked(options));
+}
+
+async function writeUniqueCommitUnlocked(options: {
   repoDir: string;
   parentSha: string;
   path: string;
@@ -90,12 +111,18 @@ export async function writeUniqueCommit(options: {
   try {
     await runProc(options.repoDir, ["git", "read-tree", options.parentSha], env);
     const blob = await hashBlob(options.repoDir, options.body);
+    if (!/^[0-9a-f]{40,64}$/i.test(blob)) {
+      throw new Error(`git hash-object returned invalid blob '${blob}'`);
+    }
     await runProc(
       options.repoDir,
-      ["git", "update-index", "--add", "--cacheinfo", `100644,${blob},${options.path}`],
+      ["git", "update-index", "--add", "--cacheinfo", "100644", blob, options.path],
       env,
     );
     const tree = (await runProc(options.repoDir, ["git", "write-tree"], env)).stdout.trim();
+    if (!/^[0-9a-f]{40,64}$/i.test(tree)) {
+      throw new Error(`git write-tree returned invalid tree '${tree}'`);
+    }
     const identity = await gitIdentity(options.repoDir);
     const commitEnv = {
       ...env,
@@ -111,6 +138,9 @@ export async function writeUniqueCommit(options: {
         commitEnv,
       )
     ).stdout.trim();
+    if (!/^[0-9a-f]{40,64}$/i.test(commit)) {
+      throw new Error(`git commit-tree returned invalid commit '${commit}'`);
+    }
     return commit;
   } finally {
     rmSync(indexDir, { recursive: true, force: true });

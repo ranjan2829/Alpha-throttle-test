@@ -129,6 +129,13 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
   let frozenSha = options.startSha ?? null;
   const payloads = new Map<string, string>();
   const mergeGate = createGate(1);
+  const ready = (async () => {
+    await ensureRemote(options.repoDir, options.forgeRepo);
+    if (!frozenSha) {
+      frozenSha = await resolveStartSha(options.repoDir, options.forgeRepo.remote, options.baseBranch);
+    }
+    return frozenSha;
+  })();
 
   return {
     kind: "live",
@@ -137,14 +144,14 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
       let pushed = false;
       payloads.set(ticket.ticketId, ticket.body);
       try {
-        await ensureRemote(options.repoDir, options.forgeRepo);
-        if (!frozenSha) {
-          frozenSha = await resolveStartSha(options.repoDir, options.forgeRepo.remote, options.baseBranch);
+        const startSha = await ready;
+        if (!startSha) {
+          throw new Error("could not freeze main SHA");
         }
         await commitAndPushUniqueFile({
           repoDir: options.repoDir,
           remote: options.forgeRepo.remote,
-          startSha: frozenSha,
+          startSha,
           branch: ticket.branch,
           path: ticket.path,
           body: ticket.body,
@@ -321,9 +328,6 @@ async function createChange(
       baseBranch,
       "--status",
       "open",
-      "--push",
-      "--remote",
-      forgeRepo.remote,
     ]);
   }
   return run(work, [

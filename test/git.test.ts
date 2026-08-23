@@ -19,6 +19,26 @@ function initRepo(): string {
   return dir;
 }
 
+test("writeUniqueCommit is safe under concurrency", async () => {
+  const repo = initRepo();
+  const parent = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();
+  const commits = await Promise.all(
+    [1, 2, 3, 4].map((n) =>
+      writeUniqueCommit({
+        repoDir: repo,
+        parentSha: parent,
+        path: `tickets/run/000${n}.md`,
+        body: `n${n}\n`,
+        message: `t${n}`,
+      }),
+    ),
+  );
+  assert.equal(new Set(commits).size, 4);
+  for (const commit of commits) {
+    assert.match(commit, /^[0-9a-f]{40,64}$/i);
+  }
+});
+
 test("writeUniqueCommit adds one file on a frozen parent", async () => {
   const repo = initRepo();
   const parent = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();
