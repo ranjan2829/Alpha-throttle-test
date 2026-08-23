@@ -26,7 +26,16 @@
       "wallSec": 8.1,
       "avgOpenMs": 1415,
       "avgMergeMs": 3399,
-      "prs": [56, 57, 58, 59, 60, 61, 62, 63]
+      "prs": [
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63
+      ]
     },
     "zeroError1200": {
       "label": "six 200-ticket episodes, 0 errors",
@@ -48,9 +57,9 @@
   },
   "running": {
     "untilMerged": 100000,
-    "merged": 4805,
+    "merged": 4920,
     "attempted": 5200,
-    "sweptMerged": 1112,
+    "sweptMerged": 1227,
     "throttled429": 0,
     "episode": "ep-6",
     "planner": "claude",
@@ -60,7 +69,19 @@
     "recordedSplits": 114,
     "claudeCuts": 20,
     "leafDeterministic": 94,
-    "firstCut": { "ticketCount": 400, "parts": [100, 100, 100, 100], "not": [200, 200] }
+    "firstCut": {
+      "ticketCount": 400,
+      "parts": [
+        100,
+        100,
+        100,
+        100
+      ],
+      "not": [
+        200,
+        200
+      ]
+    }
   },
   "prior500": {
     "wallSec": 147,
