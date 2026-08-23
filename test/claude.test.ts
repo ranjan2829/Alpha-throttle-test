@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 
 import {
   createClaudeClient,
+  DEFAULT_CLAUDE_MODEL,
   deterministicBurstSplit,
+  resolveClaudeModels,
   extractClaudeText,
+  loadDotEnv,
   parseBurstSplit,
   parseClaudeGoalSlices,
   planBurstSplit,
@@ -12,6 +18,16 @@ import {
   stripJsonFence,
 } from "../src/claude.ts";
 import { sliceTickets } from "../src/throttle/loop.ts";
+
+test("loadDotEnv fills missing keys and does not override", () => {
+  const dir = mkdtempSync(join(tmpdir(), "alpha-env-"));
+  const path = join(dir, ".env");
+  writeFileSync(path, "ANTHROPIC_API_KEY=from-file\nCLAUDE_API_KEY=other\n", "utf8");
+  const env: NodeJS.ProcessEnv = { ANTHROPIC_API_KEY: "already" };
+  loadDotEnv(path, env);
+  assert.equal(env.ANTHROPIC_API_KEY, "already");
+  assert.equal(env.CLAUDE_API_KEY, "other");
+});
 
 test("readClaudeApiKey prefers ANTHROPIC_API_KEY", () => {
   assert.equal(readClaudeApiKey({}), null);
@@ -61,6 +77,11 @@ test("extractClaudeText reads the messages payload", () => {
   );
   assert.deepEqual(parseClaudeGoalSlices(text), ["one", "two"]);
   assert.equal(stripJsonFence("```json\n{\"a\":1}\n```"), '{"a":1}');
+});
+
+test("resolveClaudeModels puts Sonnet 5 first", () => {
+  assert.equal(resolveClaudeModels()[0], DEFAULT_CLAUDE_MODEL);
+  assert.equal(resolveClaudeModels("claude-haiku-4-5-20251001")[0], "claude-haiku-4-5-20251001");
 });
 
 test("createClaudeClient posts to Anthropic", async () => {

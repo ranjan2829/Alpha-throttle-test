@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { decomposeGoalMaybeClaude, policyForAgentTarget, resolveAgentTarget, writeAgentTree } from "./agent.ts";
 import { floatFlag, intFlag, parseArgs, type CliArgs } from "./args.ts";
-import { createClaudeClient, readClaudeApiKey } from "./claude.ts";
+import { createClaudeClient, loadDotEnv, readClaudeApiKey } from "./claude.ts";
 import { PlanValidationError } from "./errors.ts";
 import { renderTree, runOrchestrator } from "./orchestrator.ts";
 import { decomposeGoal } from "./planner.ts";
@@ -19,6 +19,7 @@ import { LIVE_DEFAULT_MAX, SAFE_POLICY } from "./throttle/types.ts";
 import { DEFAULT_BOUNDS, type AdapterKind, type Bounds } from "./types.ts";
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
+  loadDotEnv();
   const args = parseArgs(argv);
   switch (args.command) {
     case "run":

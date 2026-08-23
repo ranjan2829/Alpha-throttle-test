@@ -1,6 +1,14 @@
+import { existsSync, readFileSync } from "node:fs";
+
 import { parseJsonObject, requireArray } from "./json.ts";
 
-export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514";
+export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5";
+export const CLAUDE_MODEL_FALLBACKS = [
+  "claude-sonnet-5",
+  "claude-sonnet-4-6",
+  "claude-sonnet-4-5-20250929",
+  "claude-haiku-4-5-20251001",
+] as const;
 export const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 
 export interface ClaudeClient {
@@ -21,9 +29,38 @@ export interface BurstSplit {
   parts: number[];
 }
 
+export function loadDotEnv(
+  filePath = ".env",
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  if (!existsSync(filePath)) return;
+  const text = readFileSync(filePath, "utf8");
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (line.length === 0 || line.startsWith("#")) continue;
+    const stripped = line.startsWith("export ") ? line.slice(7) : line;
+    const eq = stripped.indexOf("=");
+    if (eq <= 0) continue;
+    const name = stripped.slice(0, eq).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) continue;
+    if (env[name] !== undefined && env[name] !== "") continue;
+    let value = stripped.slice(eq + 1).trim();
+    if (
+      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    env[name] = value;
+  }
+}
+
 export function readClaudeApiKey(
   env: NodeJS.ProcessEnv = process.env,
 ): string | null {
+  if (env === process.env) {
+    loadDotEnv(".env", env);
+  }
   const key = env.ANTHROPIC_API_KEY ?? env.CLAUDE_API_KEY;
   if (typeof key !== "string") return null;
   const trimmed = key.trim();
@@ -47,27 +84,42 @@ export function createClaudeClient(
   };
 }
 
+export function resolveClaudeModels(preferred?: string): string[] {
+  const fromEnv = process.env.CLAUDE_MODEL?.trim();
+  const first = preferred ?? (fromEnv && fromEnv.length > 0 ? fromEnv : DEFAULT_CLAUDE_MODEL);
+  const rest = CLAUDE_MODEL_FALLBACKS.filter((model) => model !== first);
+  return [first, ...rest];
+}
+
 export async function claudeComplete(options: ClaudeCompleteOptions): Promise<string> {
   const fetchImpl = options.fetchImpl ?? fetch;
-  const response = await fetchImpl(ANTHROPIC_MESSAGES_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": options.apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: options.model ?? DEFAULT_CLAUDE_MODEL,
-      max_tokens: options.maxTokens ?? 1024,
-      system: options.system,
-      messages: [{ role: "user", content: options.prompt }],
-    }),
-  });
-  const text = await response.text();
-  if (!response.ok) {
-    throw new Error(`Claude HTTP ${response.status}: ${text.slice(0, 400)}`);
+  const models = options.model ? [options.model] : resolveClaudeModels();
+  let lastError = "Claude request failed";
+  for (const model of models) {
+    const response = await fetchImpl(ANTHROPIC_MESSAGES_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": options.apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: options.maxTokens ?? 1024,
+        system: options.system,
+        messages: [{ role: "user", content: options.prompt }],
+      }),
+    });
+    const text = await response.text();
+    if (response.ok) {
+      return extractClaudeText(text);
+    }
+    lastError = `Claude HTTP ${response.status}: ${text.slice(0, 400)}`;
+    if (response.status !== 404) {
+      throw new Error(lastError);
+    }
   }
-  return extractClaudeText(text);
+  throw new Error(lastError);
 }
 
 export function extractClaudeText(body: string): string {
