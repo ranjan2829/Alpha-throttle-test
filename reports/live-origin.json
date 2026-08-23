@@ -1,97 +1,16 @@
 {
-  "title": "Alpha throttle live Origin report",
-  "measuredAt": "2026-08-23T19:41:46.512Z",
-  "planner": "claude-sonnet-5",
+  "measuredAt": "2026-08-23T19:53:35.131Z",
   "forge": "origin",
   "repo": "allocations/Alpha-throttle-test",
-  "index": "https://cursor.com/codebase/allocations/Alpha-throttle-test",
-  "identity": {
-    "commit": "Ranjan S <ranjan@allocations.com>",
-    "originLogin": "ranjan@allocations.com",
-    "mergeStrategy": "merge-commit (not squash)"
-  },
-  "target": {
-    "untilMerged": 100000,
-    "requested": "500 PRs / minute (open + check + merge)",
-    "notPossible": "500 PRs / second over Origin HTTP"
-  },
-  "cleanest": {
-    "proof8": {
-      "attempted": 8,
-      "opened": 8,
-      "merged": 8,
-      "errors": 0,
-      "throttled429": 0,
-      "checkFailures": 0,
-      "wallSec": 8.1,
-      "avgOpenMs": 1415,
-      "avgMergeMs": 3399,
-      "prs": [
-        56,
-        57,
-        58,
-        59,
-        60,
-        61,
-        62,
-        63
-      ]
-    },
-    "zeroError1200": {
-      "label": "six 200-ticket episodes, 0 errors",
-      "startedAt": "2026-08-23T19:15:07.650Z",
-      "finishedAt": "2026-08-23T19:24:46.176Z",
-      "wallSec": 578.5,
-      "attempted": 1200,
-      "opened": 1200,
-      "mergedInLoop": 982,
-      "swept": 37,
-      "mergedTotal": 1019,
-      "errors": 0,
-      "throttled429": 0,
-      "checkFailures": 0,
-      "attemptedPerMin": 124.5,
-      "openedPerMin": 124.5,
-      "mergedPerMin": 105.7
-    }
-  },
-  "running": {
-    "untilMerged": 100000,
-    "merged": 4920,
-    "attempted": 5200,
-    "sweptMerged": 1227,
-    "throttled429": 0,
-    "episode": "ep-6",
-    "planner": "claude",
-    "note": "in progress; same workspace resumes from progress.json"
-  },
-  "claude": {
-    "recordedSplits": 114,
-    "claudeCuts": 20,
-    "leafDeterministic": 94,
-    "firstCut": {
-      "ticketCount": 400,
-      "parts": [
-        100,
-        100,
-        100,
-        100
-      ],
-      "not": [
-        200,
-        200
-      ]
-    }
-  },
-  "prior500": {
-    "wallSec": 147,
-    "attempted": 500,
-    "opened": 369,
-    "mergedInLoop": 292,
-    "sweptAfter": 13,
-    "mergedTotal": 305,
-    "errors": 131,
-    "throttled429": 0,
-    "note": "empty git SHA stdout under load; retries added after this run. Not the clean headline."
-  }
+  "author": "Ranjan S <ranjan@allocations.com>",
+  "targetMerged": 100000,
+  "tried": 6000,
+  "opened": 5770,
+  "merged": 5681,
+  "errors": 230,
+  "throttled429": 0,
+  "wallMin": 38.5,
+  "mergedPerMin": 148,
+  "latestMergedPr": 6964,
+  "status": "running"
 }
