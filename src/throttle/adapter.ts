@@ -76,6 +76,8 @@ export interface LiveAdapterOptions {
   merge: boolean;
   /** Frozen main SHA for every open. Sibling PRs, no Origin stack. */
   startSha?: string;
+  /** Parallel squash-merges. Unique files make this safe; races retry. */
+  mergeConcurrency?: number;
 }
 
 export interface CheckRow {
@@ -128,7 +130,7 @@ export function classifyLiveFailure(message: string, pushed: boolean): {
 export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
   let frozenSha = options.startSha ?? null;
   const payloads = new Map<string, string>();
-  const mergeGate = createGate(1);
+  const mergeGate = createGate(Math.max(1, options.mergeConcurrency ?? 1));
   const ready = (async () => {
     await ensureRemote(options.repoDir, options.forgeRepo);
     if (!frozenSha) {

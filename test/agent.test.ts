@@ -53,6 +53,23 @@ test("Claude planner turns slices into a recursive plan", async () => {
   assert.ok(plan.tasks.some((task) => task.type === "subplanner"));
 });
 
+test("createGate can run two jobs at once", async () => {
+  const gate = createGate(2);
+  let overlap = 0;
+  let peak = 0;
+  await Promise.all(
+    [1, 2].map(() =>
+      gate(async () => {
+        overlap += 1;
+        peak = Math.max(peak, overlap);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        overlap -= 1;
+      }),
+    ),
+  );
+  assert.equal(peak, 2);
+});
+
 test("createGate serializes the critical section", async () => {
   const gate = createGate(1);
   const order: number[] = [];

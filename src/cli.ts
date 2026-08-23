@@ -225,6 +225,11 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
     }
   }
   const merge = live && !args.switches.has("no-merge");
+  const mergeConcurrency = intFlag(
+    args,
+    "merge-concurrency",
+    mode.agent && live ? Math.min(16, Math.max(4, target.concurrency)) : 1,
+  );
   const adapter = live
     ? createLiveAdapter({
         clock,
@@ -232,6 +237,7 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
         forgeRepo,
         baseBranch: args.flags.get("base") ?? "main",
         merge,
+        mergeConcurrency,
       })
     : createDryRunAdapter({
         clock,
@@ -256,7 +262,7 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
   const label = mode.agent ? "recursive agent" : "throttle";
   if (live) {
     process.stdout.write(
-      `LIVE ${label} (${forgeRepo.forge} ${forgeRepo.slug}): planner=${planner} max=${target.maxPrs} rate=${target.ratePerSec}/s concurrency=${target.concurrency} window=${target.window}\n`,
+      `LIVE ${label} (${forgeRepo.forge} ${forgeRepo.slug}): planner=${planner} max=${target.maxPrs} rate=${target.ratePerSec}/s concurrency=${target.concurrency} mergeConcurrency=${mergeConcurrency} window=${target.window}\n`,
     );
   } else {
     process.stdout.write(
