@@ -25,28 +25,34 @@ Author: Ranjan S `<ranjan@allocations.com>`
 
 ## Flow
 
-Claude only splits. Workers open and merge.
+Recursive AI agent. Claude is the planner. Same function calls itself on each slice until `maxDepth`.
 
 ```mermaid
 flowchart TB
-  T[400 tickets] --> C[Claude Sonnet 5 Anthropic API]
-  C -->|JSON split 400 to 100 100 100 100| P1[planner depth 1]
-  C --> P2[planner depth 1]
-  C --> P3[planner depth 1]
-  C --> P4[planner depth 1]
-  P1 -->|Claude again 100 to 25 25 25 25| L1[leaf workers]
-  P2 --> L2[leaf workers]
-  P3 --> L3[leaf workers]
-  P4 --> L4[leaf workers]
-  L1 --> W[unique file then open PR then merge]
-  L2 --> W
-  L3 --> W
-  L4 --> W
+  G[user goal] --> R[Claude planner depth 0]
+  R --> W1[worker]
+  R --> W2[worker]
+  R --> V[verifier]
+  R --> S1[subplanner depth 1]
+  S1 --> R2[Claude planner depth 1]
+  R2 --> W3[worker]
+  R2 --> W4[worker]
+  R2 --> V2[verifier]
+  R2 --> S2[subplanner depth 2]
+  S2 --> R3[Claude planner depth 2]
+  R3 --> W5[worker]
+  R3 --> V3[verifier]
+  W1 --> H[handoff.json]
+  W2 --> H
+  W3 --> H
+  W4 --> H
+  W5 --> H
+  V -->|reject| W1
+  V2 -->|reject| W3
+  V3 -->|reject| W5
+  V -->|accept| D[done]
+  V2 -->|accept| D
+  V3 -->|accept| D
 ```
 
-```mermaid
-flowchart LR
-  W[worker] --> F[tickets/run/seq.md] --> P[open PR] --> M[merge] --> Q{merged 10000?}
-  Q -->|no| C[Claude splits the next chunk] --> W
-  Q -->|yes| S[stop]
-```
+Hard stop: depth 3. Workers never see siblings. Leaves do one scoped task and write a handoff.
