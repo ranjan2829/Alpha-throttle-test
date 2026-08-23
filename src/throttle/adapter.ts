@@ -114,7 +114,9 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
         await run(work, ["git", "push", "-u", options.forgeRepo.remote, ticket.branch]);
         pushed = true;
         const created = await createChange(work, options.forgeRepo, options.baseBranch, ticket);
-        const urlMatch = created.stdout.match(/https:\/\/(?:origin\.cursor\.com|github\.com)\/\S+/);
+        const urlMatch = created.stdout.match(
+          /https:\/\/(?:cursor\.com\/codebase|origin\.cursor\.com|github\.com)\/\S+/,
+        );
         const numberMatch = created.stdout.match(/\/(?:pull|change|changes)\/(\d+)/);
         return {
           ticketId: ticket.ticketId,

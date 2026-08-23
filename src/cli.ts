@@ -186,6 +186,7 @@ async function commandThrottle(args: CliArgs): Promise<number> {
     currentRatePerSec: rate,
     concurrency,
     maxPrsPerRun,
+    maxOpenPrs: Math.max(SAFE_POLICY.maxOpenPrs, maxPrsPerRun, concurrency),
     lastUpdated: clock.now(),
     reason: live ? "cli --live" : "cli dry-run",
   };
