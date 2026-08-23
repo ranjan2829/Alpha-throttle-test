@@ -7,7 +7,7 @@ You are running the Alpha throttle recursive-agent harness.
 3. If you are a **worker**, read `prompts/worker.md` and only `nodes/<your-task>/context.json`. Produce one `handoff.json`. Do not contact siblings.
 4. If you are a **verifier**, read `prompts/verifier.md`. Accept or reject the named target. A reject is how respawn happens; you do not fix the work.
 
-5. If you are the **throttle planner** or **recursive agent**, read `prompts/throttle.md` and `prompts/origin.md`. Default to dry-run. Live forge is Origin via `origin pr`. `npx tsx src/cli.ts agent` is the recursive AI entry. Claude is used when `ANTHROPIC_API_KEY` is set. Never pass `--live` unless the user asked. Never raise `--max` / `--rate` / `--per-minute` past what they set.
+5. If you are the **throttle planner** or **recursive agent**, read `README.md` (live Origin report), `prompts/throttle.md`, and `prompts/origin.md`. Default to dry-run. Live forge is Origin via `origin pr`. `npx tsx src/cli.ts agent` is the recursive AI entry. Claude is used when `ANTHROPIC_API_KEY` is set. Never pass `--live` unless the user asked. Never raise `--max` / `--rate` / `--per-minute` past what they set. Quote `reports/live-origin.json` for measured rates — do not invent faster numbers.
 6. If the user asked to put this agent **on Cursor Origin**, run `npx tsx src/cli.ts origin-setup`. That mirrors GitHub `ranjan2829/Alpha-throttle-test` → Origin `ranjan-rgb/Alpha-throttle-test` (personal, not allocations). Do not invent a second harness. If Origin is not logged in, print the login commands and stop.
 
 Bounds in `plan.bounds` and `rates.json` are hard stops. Never raise `maxDepth`, `maxConcurrentChildren`, or live PR caps to "just finish."

@@ -1,0 +1,67 @@
+{
+  "title": "Alpha throttle live Origin report",
+  "measuredAt": "2026-08-23T19:09:33.000Z",
+  "planner": "claude-sonnet-5",
+  "forge": "origin",
+  "repo": "allocations/Alpha-throttle-test",
+  "index": "https://cursor.com/codebase/allocations/Alpha-throttle-test",
+  "target": {
+    "requested": "500 PRs / minute (open + check + merge)",
+    "notPossible": "500 PRs / second over Origin HTTP"
+  },
+  "headline": {
+    "wallSec": 147,
+    "attempted": 500,
+    "opened": 369,
+    "mergedInLoop": 292,
+    "sweptAfter": 13,
+    "mergedTotal": 305,
+    "leftOpen": 77,
+    "errors": 131,
+    "throttled429": 0,
+    "checkFailures": 0,
+    "ci": "none"
+  },
+  "rates": {
+    "attemptedPerMin": 204.1,
+    "openedPerMin": 150.6,
+    "mergedPerMin": 119.2,
+    "attemptedPerSec": 3.4,
+    "openedPerSec": 2.51,
+    "mergedPerSec": 1.99
+  },
+  "success": {
+    "openRate": 0.738,
+    "mergeOfOpened": 0.791,
+    "mergeOfAttempted": 0.584,
+    "mergeOfAttemptedAfterSweep": 0.61
+  },
+  "latencyMs": {
+    "open": { "avg": 52766, "p50": 54301, "p95": 95108 },
+    "merge": { "avg": 6569, "p50": 5981, "p95": 10660, "n": 292 }
+  },
+  "errors": {
+    "gitCommitTreeEmpty": 56,
+    "gitHashObjectEmpty": 44,
+    "gitWriteTreeEmpty": 31,
+    "total": 131,
+    "note": "empty git SHA stdout under load; retries added after this run"
+  },
+  "prNumbersSeen": { "min": 64, "max": 432, "withUrl": 336 },
+  "proof8": {
+    "attempted": 8,
+    "merged": 8,
+    "errors": 0,
+    "throttled429": 0,
+    "avgOpenMs": 1415,
+    "avgMergeMs": 3399,
+    "wallSec": 8.7,
+    "prs": [56, 57, 58, 59, 60, 61, 62, 63]
+  },
+  "prior": {
+    "originProbe2": { "attempted": 2, "opened": 2, "avgOpenMs": 1260, "merged": 0 },
+    "originSat50": { "attempted": 50, "opened": 43, "errors": 7, "throttled429": 0, "wallSec": 37.0, "openedPerSec": 1.16 },
+    "originMerge10": { "attempted": 10, "opened": 9, "merged": 6, "errors": 1 },
+    "githubSat5": { "attempted": 5, "realPrs": 0, "branchesPushed": 4, "note": "gh pr create 403 for integration token" }
+  }
+}
