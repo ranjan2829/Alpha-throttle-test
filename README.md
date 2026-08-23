@@ -25,18 +25,28 @@ Author: Ranjan S `<ranjan@allocations.com>`
 
 ## Flow
 
+Claude only splits. Workers open and merge.
+
 ```mermaid
-flowchart TD
-  A[1 chunk of tickets] --> B[2 Claude Sonnet 5]
-  B --> C[3 JSON split]
-  C --> D[4 child planners]
-  D --> E{5 depth under 3?}
-  E -->|yes| B
-  E -->|no| F[6 leaf worker]
-  F --> G[7 write unique file]
-  G --> H[8 open Origin PR]
-  H --> I[9 merge]
-  I --> J{10 hit 10000 merges?}
-  J -->|no| A
-  J -->|yes| K[11 stop]
+flowchart TB
+  T[400 tickets] --> C[Claude Sonnet 5 Anthropic API]
+  C -->|JSON split 400 to 100 100 100 100| P1[planner depth 1]
+  C --> P2[planner depth 1]
+  C --> P3[planner depth 1]
+  C --> P4[planner depth 1]
+  P1 -->|Claude again 100 to 25 25 25 25| L1[leaf workers]
+  P2 --> L2[leaf workers]
+  P3 --> L3[leaf workers]
+  P4 --> L4[leaf workers]
+  L1 --> W[unique file then open PR then merge]
+  L2 --> W
+  L3 --> W
+  L4 --> W
+```
+
+```mermaid
+flowchart LR
+  W[worker] --> F[tickets/run/seq.md] --> P[open PR] --> M[merge] --> Q{merged 10000?}
+  Q -->|no| C[Claude splits the next chunk] --> W
+  Q -->|yes| S[stop]
 ```
