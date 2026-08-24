@@ -1,0 +1,15 @@
+{
+  "id": "g14-memory-read-c5a5aef3",
+  "generation": 14,
+  "title": "Memory panel readability",
+  "summary": "Separated open defects from accepted history and gave each row a clearer meta line.",
+  "acceptedAt": "2026-08-24T09:16:53.786Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g14-memory-read-c5a5aef3",
+    "kind": "copy",
+    "title": "Memory panel readability",
+    "body": "Memory remains the source of truth. Do not hide history.",
+    "tone": "mint"
+  }
+}

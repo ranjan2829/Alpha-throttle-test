@@ -1,0 +1,15 @@
+{
+  "id": "g18-elevation-88acad7a",
+  "generation": 18,
+  "title": "Layered elevation",
+  "summary": "Hero and panels sit above the page wash; inner cards stay flatter so depth reads as hierarchy.",
+  "acceptedAt": "2026-08-24T09:16:53.789Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g18-elevation-88acad7a",
+    "kind": "copy",
+    "title": "Layered elevation",
+    "body": "One shadow language. No neon glow.",
+    "tone": "mint"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "g4-cards-37621d12",
+  "generation": 4,
+  "title": "Pipeline and widget cards",
+  "summary": "Gave planner / worker / verifier / merge and worker widgets a shared card language.",
+  "acceptedAt": "2026-08-24T09:04:36.963Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g4-cards-37621d12",
+    "kind": "copy",
+    "title": "Pipeline and widget cards",
+    "body": "Tone stripes stay; no dotted magenta leftovers.",
+    "tone": "mint"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "g13-motion-c9bd0e97",
+  "generation": 13,
+  "title": "Subtle motion",
+  "summary": "Added short, low-amplitude transitions on hover and paint so the UI feels finished, not jumpy.",
+  "acceptedAt": "2026-08-24T09:16:53.785Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g13-motion-c9bd0e97",
+    "kind": "copy",
+    "title": "Subtle motion",
+    "body": "150–180ms, opacity and border only. No bounce, no spin.",
+    "tone": "mint"
+  }
+}

@@ -4,9 +4,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { classifyLiveFailure, createDryRunAdapter } from "../src/throttle/adapter.ts";
+import {
+  classifyLiveFailure,
+  createDryRunAdapter,
+  isMergeRace,
+  originMergeArgv,
+  summarizeChecks,
+  type PrAdapter,
+} from "../src/throttle/adapter.ts";
 import { runThrottleLoop } from "../src/throttle/loop.ts";
 import { learn, plannedBurst, shouldSplitBurst, summarizeOutcomes } from "../src/throttle/policy.ts";
+import { saveProgress } from "../src/throttle/store.ts";
 import { SAFE_POLICY, type Clock, type RatePolicy, type TicketOutcome } from "../src/throttle/types.ts";
 
 function tmpWorkspace(): string {
@@ -40,6 +48,17 @@ test("learn backs off rate and concurrency on 429", () => {
   assert.match(after.reason, /backoff/);
 });
 
+test("learn backs off when a build fails", () => {
+  const before = policy({ currentRatePerSec: 8, concurrency: 4 });
+  const stats = summarizeOutcomes([
+    outcome({ status: "rejected", checkStatus: "failure", checkCount: 1 }),
+    outcome({ status: "opened" }),
+  ]);
+  const after = learn(before, stats, "2026-01-01T00:00:00.000Z");
+  assert.equal(after.currentRatePerSec, 4);
+  assert.match(after.reason, /build failed/);
+});
+
 test("learn speeds up on a clean burst", () => {
   const before = policy({ currentRatePerSec: 2, concurrency: 2, maxOpenPrs: 5 });
   const stats = summarizeOutcomes([
@@ -55,6 +74,143 @@ test("plannedBurst never exceeds maxPrsPerRun or maxOpenPrs", () => {
   assert.equal(plannedBurst(policy({ currentRatePerSec: 1000, maxOpenPrs: 5 }), 0, 8), 5);
   assert.equal(plannedBurst(policy({ currentRatePerSec: 1000, maxOpenPrs: 50 }), 6, 8), 2);
   assert.equal(plannedBurst(policy({ currentRatePerSec: 1000, maxOpenPrs: 50 }), 8, 8), 0);
+});
+
+test("until-merged keeps chunking until the dry-run merge count hits the target", async () => {
+  const workspace = tmpWorkspace();
+  const clock = fakeClock();
+  const result = await runThrottleLoop({
+    workspace,
+    adapter: createDryRunAdapter({ clock, throttleAfter: 0, latencyMs: 0 }),
+    clock,
+    policy: policy({ currentRatePerSec: 5, maxPrsPerRun: 40, concurrency: 2, maxOpenPrs: 8 }),
+    maxPrsPerRun: 40,
+    maxEpisodes: 20,
+    maxDepth: 2,
+    live: false,
+    untilMerged: 12,
+    chunk: 5,
+  });
+  assert.ok(result.merged >= 12);
+  assert.ok(result.outcomes.length >= 12);
+  assert.ok(result.outcomes.length <= 15);
+  assert.ok(result.episodes.length >= 3);
+});
+
+test("until-merged resumes from progress.json instead of starting at zero", async () => {
+  const workspace = tmpWorkspace();
+  saveProgress(workspace, {
+    merged: 8,
+    untilMerged: 12,
+    attempted: 8,
+    sweptMerged: 0,
+    episode: "ep-2",
+  });
+  const clock = fakeClock();
+  const result = await runThrottleLoop({
+    workspace,
+    adapter: createDryRunAdapter({ clock, throttleAfter: 0, latencyMs: 0 }),
+    clock,
+    policy: policy({ currentRatePerSec: 5, maxPrsPerRun: 40, concurrency: 2, maxOpenPrs: 8 }),
+    maxPrsPerRun: 40,
+    maxEpisodes: 20,
+    maxDepth: 2,
+    live: false,
+    untilMerged: 12,
+    chunk: 5,
+  });
+  assert.ok(result.merged >= 12);
+  assert.ok(result.outcomes.length <= 5);
+});
+
+test("until-merged is a no-op when progress already hit the target", async () => {
+  const workspace = tmpWorkspace();
+  saveProgress(workspace, {
+    merged: 20,
+    untilMerged: 20,
+    attempted: 20,
+    sweptMerged: 0,
+    episode: "ep-4",
+  });
+  const result = await runThrottleLoop({
+    workspace,
+    adapter: createDryRunAdapter({ clock: fakeClock(), throttleAfter: 0, latencyMs: 0 }),
+    clock: fakeClock(),
+    policy: policy({ currentRatePerSec: 5, maxPrsPerRun: 40, concurrency: 2, maxOpenPrs: 8 }),
+    maxPrsPerRun: 40,
+    maxEpisodes: 5,
+    maxDepth: 1,
+    live: false,
+    untilMerged: 20,
+    chunk: 5,
+  });
+  assert.equal(result.merged, 20);
+  assert.equal(result.outcomes.length, 0);
+});
+
+test("live until-merged keeps going after a 429 instead of stopping the run", async () => {
+  const workspace = tmpWorkspace();
+  let opens = 0;
+  const adapter: PrAdapter = {
+    kind: "live",
+    async openTicket(ticket) {
+      opens += 1;
+      if (opens === 2) {
+        return {
+          ...outcome({ ticketId: ticket.ticketId, seq: ticket.seq, branch: ticket.branch, path: ticket.path }),
+          status: "throttled",
+          httpStatus: 429,
+        };
+      }
+      return {
+        ...outcome({ ticketId: ticket.ticketId, seq: ticket.seq, branch: ticket.branch, path: ticket.path }),
+        status: "merged",
+        httpStatus: 201,
+      };
+    },
+    async observe(item) {
+      return item;
+    },
+  };
+  const result = await runThrottleLoop({
+    workspace,
+    adapter,
+    clock: fakeClock(),
+    policy: policy({ currentRatePerSec: 2, maxPrsPerRun: 20, concurrency: 2, maxOpenPrs: 8 }),
+    maxPrsPerRun: 20,
+    maxEpisodes: 8,
+    maxDepth: 1,
+    live: true,
+    untilMerged: 4,
+    chunk: 2,
+  });
+  assert.ok(result.merged >= 4);
+  assert.ok(result.episodes.length >= 2);
+});
+
+test("dry-run loop uses a Claude split then still writes dry-run outcomes", async () => {
+  const workspace = tmpWorkspace();
+  const clock = fakeClock();
+  const result = await runThrottleLoop({
+    workspace,
+    adapter: createDryRunAdapter({ clock, throttleAfter: 0, latencyMs: 0 }),
+    clock,
+    policy: policy({ currentRatePerSec: 8, maxPrsPerRun: 8, concurrency: 2, maxOpenPrs: 8 }),
+    maxPrsPerRun: 8,
+    maxEpisodes: 1,
+    maxDepth: 3,
+    live: false,
+    claude: {
+      complete: async () => '{"kind":"parts","parts":[5,3]}',
+    },
+  });
+  assert.equal(result.outcomes.length, 8);
+  assert.ok(result.outcomes.every((item) => item.status === "dry-run"));
+  const splits = readFileSync(join(workspace, "claude-splits.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as { planner: string; parts: number[] });
+  assert.ok(splits.some((row) => row.planner === "claude" && row.parts[0] === 5 && row.parts[1] === 3));
 });
 
 test("dry-run loop does not open GitHub PRs and writes rates.json", async () => {
@@ -123,13 +279,52 @@ function outcome(partial: Partial<TicketOutcome>): TicketOutcome {
     ticketId: "t",
     seq: 1,
     branch: "cursor/throttle-t-ec34",
+    path: "tickets/t/0001.md",
     status: "dry-run",
     prNumber: null,
     prUrl: null,
     httpStatus: 200,
     latencyMs: 1,
     mergeMs: null,
+    checkStatus: "none",
+    checkCount: 0,
     error: null,
     ...partial,
   };
 }
+
+test("Origin merge keeps the ticket commit instead of squashing it away", () => {
+  assert.deepEqual(originMergeArgv("allocations/Alpha-throttle-test", "56"), [
+    "origin",
+    "pr",
+    "merge",
+    "56",
+    "-R",
+    "allocations/Alpha-throttle-test",
+    "--merge",
+  ]);
+  assert.ok(!originMergeArgv("allocations/Alpha-throttle-test", "56").includes("--squash"));
+});
+
+test("isMergeRace detects Origin main-ref collisions", () => {
+  assert.equal(isMergeRace("ref updates rejected by git at prepare: refs/heads/main"), true);
+  assert.equal(isMergeRace("updated by another push in the same batch"), true);
+  assert.equal(isMergeRace("stack head conflicts with main"), true);
+  assert.equal(isMergeRace("build failed"), false);
+});
+
+test("summarizeChecks treats empty as none and failures as failure", () => {
+  assert.deepEqual(summarizeChecks([]), { checkStatus: "none", checkCount: 0 });
+  assert.deepEqual(summarizeChecks([{ name: "ci", status: "completed", conclusion: "success" }]), {
+    checkStatus: "success",
+    checkCount: 1,
+  });
+  assert.deepEqual(summarizeChecks([{ name: "ci", status: "completed", conclusion: "failure" }]), {
+    checkStatus: "failure",
+    checkCount: 1,
+  });
+  assert.deepEqual(summarizeChecks([{ name: "ci", status: "in_progress" }]), {
+    checkStatus: "pending",
+    checkCount: 1,
+  });
+});

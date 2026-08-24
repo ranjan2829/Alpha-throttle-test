@@ -1,0 +1,22 @@
+.legend { align-items: center; gap: 10px; }
+.legend .dot {
+  display: inline-flex; align-items: center; gap: 6px;
+  text-transform: lowercase;
+}
+.legend .dot::before {
+  content: ""; width: 8px; height: 8px; border-radius: 99px; background: var(--muted);
+}
+.legend .dot.planner::before { background: var(--violet); }
+.legend .dot.worker::before { background: var(--mint); }
+.legend .dot.verifier::before { background: var(--amber); }
+.legend .dot.merge::before { background: var(--sky); }
+.node { min-width: 0; }
+.node-card { padding-right: 42px; }
+.node.role-planner > .node-card { box-shadow: inset 3px 0 0 var(--violet); }
+.node.role-worker > .node-card { box-shadow: inset 3px 0 0 var(--mint); }
+.node.role-verifier > .node-card { box-shadow: inset 3px 0 0 var(--amber); }
+.node.role-merge > .node-card { box-shadow: inset 3px 0 0 var(--sky); }
+.node.status-running > .node-card { border-color: #3d6a5c; }
+.node.status-done > .node-card { border-color: #245246; }
+.node.status-queued > .node-card { opacity: 0.86; }
+.kids { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 4px 8px; padding-left: 14px; border-left: 1px dashed #334055; }

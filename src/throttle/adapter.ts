@@ -1,9 +1,8 @@
 import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 
 import { compareUrlFor, type ForgeRepo } from "./forge.ts";
-import type { Clock, TicketOutcome, TicketSpec, ThrottleAdapterKind } from "./types.ts";
+import { commitAndPushUniqueFile, resolveStartSha, runProc, writeUniqueCommit } from "./git.ts";
+import type { CheckStatus, Clock, TicketOutcome, TicketSpec, ThrottleAdapterKind } from "./types.ts";
 
 export interface PrAdapter {
   readonly kind: ThrottleAdapterKind;
@@ -32,25 +31,31 @@ export function createDryRunAdapter(options: DryRunOptions): PrAdapter {
           ticketId: ticket.ticketId,
           seq: ticket.seq,
           branch: ticket.branch,
+          path: ticket.path,
           status: "throttled",
           prNumber: null,
           prUrl: null,
           httpStatus: 429,
           latencyMs,
           mergeMs: null,
+          checkStatus: "none",
+          checkCount: 0,
           error: "simulated 429 Too Many Requests",
         };
       }
       return {
-        ticketId: ticket.ticketId,
-        seq: ticket.seq,
-        branch: ticket.branch,
-        status: "dry-run",
+          ticketId: ticket.ticketId,
+          seq: ticket.seq,
+          branch: ticket.branch,
+          path: ticket.path,
+          status: "dry-run",
         prNumber: null,
         prUrl: `dry-run://ticket/${ticket.ticketId}`,
         httpStatus: 200,
         latencyMs,
         mergeMs: options.latencyMs,
+        checkStatus: "success",
+        checkCount: 1,
         error: null,
       };
     },
@@ -68,6 +73,45 @@ export interface LiveAdapterOptions {
   repoDir: string;
   forgeRepo: ForgeRepo;
   baseBranch: string;
+  merge: boolean;
+  /** Frozen main SHA for every open. Sibling PRs, no Origin stack. */
+  startSha?: string;
+  /** Parallel merge-commits. Unique files make this safe; races retry. */
+  mergeConcurrency?: number;
+  /** This repo has no CI. Skip origin pr checks to keep merge volume up. */
+  skipChecks?: boolean;
+  /** Treat a successful merge command as merged; skip a follow-up pr view. */
+  trustMerge?: boolean;
+}
+
+export interface CheckRow {
+  name?: string;
+  status?: string;
+  conclusion?: string;
+}
+
+export function summarizeChecks(rows: CheckRow[]): { checkStatus: CheckStatus; checkCount: number } {
+  if (rows.length === 0) {
+    return { checkStatus: "none", checkCount: 0 };
+  }
+  const blob = rows
+    .map((row) => `${row.status ?? ""} ${row.conclusion ?? ""}`)
+    .join(" ");
+  if (/fail/i.test(blob)) {
+    return { checkStatus: "failure", checkCount: rows.length };
+  }
+  if (/pending|queued|in_progress|running/i.test(blob)) {
+    return { checkStatus: "pending", checkCount: rows.length };
+  }
+  return { checkStatus: "success", checkCount: rows.length };
+}
+
+export function parseCheckRows(text: string): CheckRow[] {
+  const parsed: unknown = JSON.parse(text);
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+  return parsed.filter((row): row is CheckRow => typeof row === "object" && row !== null);
 }
 
 export function compareUrl(owner: string, repo: string, base: string, head: string): string {
@@ -88,44 +132,56 @@ export function classifyLiveFailure(message: string, pushed: boolean): {
 }
 
 export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
+  let frozenSha = options.startSha ?? null;
+  const payloads = new Map<string, string>();
+  const mergeGate = createGate(Math.max(1, options.mergeConcurrency ?? 1));
+  const ready = (async () => {
+    await ensureRemote(options.repoDir, options.forgeRepo);
+    if (!frozenSha) {
+      frozenSha = await resolveStartSha(options.repoDir, options.forgeRepo.remote, options.baseBranch);
+    }
+    return frozenSha;
+  })();
+
   return {
     kind: "live",
     async openTicket(ticket: TicketSpec): Promise<TicketOutcome> {
       const started = options.clock.nowMs();
       let pushed = false;
+      payloads.set(ticket.ticketId, ticket.body);
       try {
-        const work = join(options.repoDir, ".alpha", "worktrees", ticket.ticketId);
-        mkdirSync(join(options.repoDir, ".alpha", "worktrees"), { recursive: true });
-        await ensureRemote(options.repoDir, options.forgeRepo);
-        const startPoint = await resolveStartPoint(options.repoDir, options.forgeRepo, options.baseBranch);
-        await run(options.repoDir, [
-          "git",
-          "worktree",
-          "add",
-          "-B",
-          ticket.branch,
-          work,
-          startPoint,
-        ]);
-        mkdirSync(join(work, "tickets"), { recursive: true });
-        writeFileSync(join(work, ticket.path), ticket.body, "utf8");
-        await run(work, ["git", "add", ticket.path]);
-        await run(work, ["git", "commit", "-m", ticket.title]);
-        await run(work, ["git", "push", "-u", options.forgeRepo.remote, ticket.branch]);
+        const startSha = await ready;
+        if (!startSha) {
+          throw new Error("could not freeze main SHA");
+        }
+        await commitAndPushUniqueFile({
+          repoDir: options.repoDir,
+          remote: options.forgeRepo.remote,
+          startSha,
+          branch: ticket.branch,
+          path: ticket.path,
+          body: ticket.body,
+          message: ticket.title,
+        });
         pushed = true;
-        const created = await createChange(work, options.forgeRepo, options.baseBranch, ticket);
-        const urlMatch = created.stdout.match(/https:\/\/(?:origin\.cursor\.com|github\.com)\/\S+/);
-        const numberMatch = created.stdout.match(/\/(?:pull|change|changes)\/(\d+)/);
+        const created = await createChange(options.repoDir, options.forgeRepo, options.baseBranch, ticket);
+        const parsed = parseCreatedChange(created.stdout);
+        if (parsed.prNumber && options.forgeRepo.forge === "origin") {
+          await clearOriginStack(options.repoDir, options.forgeRepo.slug, String(parsed.prNumber));
+        }
         return {
           ticketId: ticket.ticketId,
           seq: ticket.seq,
           branch: ticket.branch,
+          path: ticket.path,
           status: "opened",
-          prNumber: numberMatch?.[1] ? Number(numberMatch[1]) : null,
-          prUrl: urlMatch?.[0] ?? null,
+          prNumber: parsed.prNumber,
+          prUrl: parsed.prUrl,
           httpStatus: 201,
           latencyMs: options.clock.nowMs() - started,
           mergeMs: null,
+          checkStatus: "none",
+          checkCount: 0,
           error: null,
         };
       } catch (err) {
@@ -135,6 +191,7 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
           ticketId: ticket.ticketId,
           seq: ticket.seq,
           branch: ticket.branch,
+          path: ticket.path,
           status: classified.status,
           prNumber: null,
           prUrl: pushed
@@ -143,6 +200,8 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
           httpStatus: classified.httpStatus,
           latencyMs: options.clock.nowMs() - started,
           mergeMs: null,
+          checkStatus: "none",
+          checkCount: 0,
           error:
             classified.status === "opened"
               ? "branch pushed; PR create forbidden for this token — open via origin pr create or Cursor"
@@ -151,21 +210,102 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
       }
     },
     async observe(outcome: TicketOutcome): Promise<TicketOutcome> {
+      if (outcome.status === "throttled" || outcome.status === "error") {
+        return outcome;
+      }
       if (!outcome.prNumber && !outcome.branch) return outcome;
       try {
-        const viewed = await observeChange(options.repoDir, options.forgeRepo, outcome);
+        const checks = options.skipChecks
+          ? { checkStatus: "none" as const, checkCount: 0 }
+          : await readChecks(options.repoDir, options.forgeRepo, outcome);
+        const next: TicketOutcome = { ...outcome, ...checks };
+        if (checks.checkStatus === "failure") {
+          return { ...next, status: "rejected", error: "build failed" };
+        }
+        if (options.merge && next.status === "opened") {
+          const mergeStarted = options.clock.nowMs();
+          await mergeGate(() =>
+            mergeIndependentChange({
+              repoDir: options.repoDir,
+              forgeRepo: options.forgeRepo,
+              baseBranch: options.baseBranch,
+              outcome: next,
+              body: payloads.get(next.ticketId) ?? next.path,
+            }),
+          );
+          if (options.trustMerge) {
+            return {
+              ...next,
+              status: "merged",
+              mergeMs: options.clock.nowMs() - mergeStarted,
+            };
+          }
+          const viewed = await observeChange(options.repoDir, options.forgeRepo, next);
+          if (viewed.state === "MERGED" || viewed.state === "merged") {
+            return {
+              ...next,
+              status: "merged",
+              prUrl: viewed.url ?? next.prUrl,
+              mergeMs: options.clock.nowMs() - mergeStarted,
+            };
+          }
+          return {
+            ...next,
+            status: "error",
+            prUrl: viewed.url ?? next.prUrl,
+            mergeMs: options.clock.nowMs() - mergeStarted,
+            error: `merge did not complete: ${viewed.state ?? "unknown"}`,
+          };
+        }
+        const viewed = await observeChange(options.repoDir, options.forgeRepo, next);
         if (viewed.state === "MERGED" || viewed.state === "merged") {
-          return { ...outcome, status: "merged", prUrl: viewed.url ?? outcome.prUrl };
+          return { ...next, status: "merged", prUrl: viewed.url ?? next.prUrl };
         }
         if (viewed.state === "CLOSED" || viewed.state === "closed") {
-          return { ...outcome, status: "rejected", prUrl: viewed.url ?? outcome.prUrl };
+          return { ...next, status: "rejected", prUrl: viewed.url ?? next.prUrl };
         }
-        return { ...outcome, status: "opened", prUrl: viewed.url ?? outcome.prUrl };
+        return { ...next, status: "opened", prUrl: viewed.url ?? next.prUrl };
       } catch (err) {
         const message = err instanceof Error ? err.message : "observe failed";
         return { ...outcome, error: message };
       }
     },
+  };
+}
+
+export function parseCreatedChange(text: string): { prNumber: number | null; prUrl: string | null } {
+  const urlMatch = text.match(/https:\/\/(?:cursor\.com\/codebase|origin\.cursor\.com|github\.com)\/\S+/);
+  const numberMatch = text.match(/\/(?:pull|change|changes)\/(\d+)/);
+  return {
+    prNumber: numberMatch?.[1] ? Number(numberMatch[1]) : null,
+    prUrl: urlMatch?.[0] ?? null,
+  };
+}
+
+export function createGate(concurrency: number): <T>(job: () => Promise<T>) => Promise<T> {
+  let active = 0;
+  const waiting: Array<() => void> = [];
+  const acquire = (): Promise<void> => {
+    if (active < concurrency) {
+      active += 1;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      waiting.push(resolve);
+    });
+  };
+  const release = (): void => {
+    const next = waiting.shift();
+    if (next) next();
+    else active = Math.max(0, active - 1);
+  };
+  return async <T>(job: () => Promise<T>): Promise<T> => {
+    await acquire();
+    try {
+      return await job();
+    } finally {
+      release();
+    }
   };
 }
 
@@ -177,16 +317,6 @@ async function ensureRemote(repoDir: string, forgeRepo: ForgeRepo): Promise<void
     return;
   }
   await run(repoDir, ["git", "remote", "set-url", forgeRepo.remote, forgeRepo.httpsUrl]);
-}
-
-async function resolveStartPoint(repoDir: string, forgeRepo: ForgeRepo, baseBranch: string): Promise<string> {
-  try {
-    await run(repoDir, ["git", "fetch", forgeRepo.remote, baseBranch]);
-    return `${forgeRepo.remote}/${baseBranch}`;
-  } catch {
-    await run(repoDir, ["git", "fetch", "origin", baseBranch]);
-    return `origin/${baseBranch}`;
-  }
 }
 
 async function createChange(
@@ -213,9 +343,6 @@ async function createChange(
       baseBranch,
       "--status",
       "open",
-      "--push",
-      "--remote",
-      forgeRepo.remote,
     ]);
   }
   return run(work, [
@@ -231,6 +358,163 @@ async function createChange(
     "--body",
     body,
   ]);
+}
+
+async function readChecks(
+  repoDir: string,
+  forgeRepo: ForgeRepo,
+  outcome: TicketOutcome,
+): Promise<{ checkStatus: CheckStatus; checkCount: number }> {
+  const target = outcome.prNumber ? String(outcome.prNumber) : outcome.branch;
+  try {
+    if (forgeRepo.forge === "origin") {
+      const checked = await run(repoDir, [
+        "origin",
+        "pr",
+        "checks",
+        target,
+        "-R",
+        forgeRepo.slug,
+        "--json",
+        "id,name,status,conclusion,detailsUrl",
+      ]);
+      return summarizeChecks(parseCheckRows(checked.stdout));
+    }
+    if (!outcome.prNumber) {
+      return { checkStatus: "none", checkCount: 0 };
+    }
+    const checked = await run(repoDir, [
+      "gh",
+      "pr",
+      "checks",
+      String(outcome.prNumber),
+      "--json",
+      "name,state,conclusion",
+    ]);
+    return summarizeChecks(parseCheckRows(checked.stdout));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "checks failed";
+    if (/no checks|not found|without checks/i.test(message)) {
+      return { checkStatus: "none", checkCount: 0 };
+    }
+    return { checkStatus: "error", checkCount: 0 };
+  }
+}
+
+export function isMergeRace(message: string): boolean {
+  return /ref updates rejected|updated by another push|stack head conflicts|needs restack|stack parent/i.test(
+    message,
+  );
+}
+
+export async function clearOriginStack(repoDir: string, repo: string, target: string): Promise<void> {
+  try {
+    await run(repoDir, ["origin", "pr", "edit", target, "-R", repo, "--clear-stack"]);
+  } catch {
+    // already a sibling change, or the hidden flag is a no-op
+  }
+}
+
+export async function mergeIndependentChange(options: {
+  repoDir: string;
+  forgeRepo: ForgeRepo;
+  baseBranch: string;
+  outcome: TicketOutcome;
+  body: string;
+}): Promise<void> {
+  let lastError = "merge failed";
+  for (let attempt = 1; attempt <= 8; attempt += 1) {
+    try {
+      if (options.forgeRepo.forge === "origin" && options.outcome.prNumber) {
+        await clearOriginStack(options.repoDir, options.forgeRepo.slug, String(options.outcome.prNumber));
+      }
+      await mergeChange(options.repoDir, options.forgeRepo, options.outcome);
+      return;
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : "merge failed";
+      if (!isMergeRace(lastError) || attempt === 8) {
+        throw err;
+      }
+      await restackOntoMain(options);
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 80 * attempt);
+      });
+    }
+  }
+  throw new Error(lastError);
+}
+
+async function restackOntoMain(options: {
+  repoDir: string;
+  forgeRepo: ForgeRepo;
+  baseBranch: string;
+  outcome: TicketOutcome;
+  body: string;
+}): Promise<void> {
+  const latest = await resolveStartSha(options.repoDir, options.forgeRepo.remote, options.baseBranch);
+  const commit = await writeUniqueCommit({
+    repoDir: options.repoDir,
+    parentSha: latest,
+    path: options.outcome.path,
+    body: options.body,
+    message: `throttle ticket ${String(options.outcome.seq).padStart(4, "0")} restack`,
+  });
+  await runProc(options.repoDir, [
+    "git",
+    "push",
+    "--force-with-lease",
+    options.forgeRepo.remote,
+    `${commit}:refs/heads/${options.outcome.branch}`,
+  ]);
+  if (options.forgeRepo.forge !== "origin") return;
+  const target = options.outcome.prNumber ? String(options.outcome.prNumber) : options.outcome.branch;
+  try {
+    await run(options.repoDir, ["origin", "pr", "refresh", target, "-R", options.forgeRepo.slug]);
+  } catch {
+    // refresh is best-effort; merge retry still runs
+  }
+  await clearOriginStack(options.repoDir, options.forgeRepo.slug, target);
+}
+
+/** Merge commit, not squash. Squash rewrites the author to Origin's noreply. */
+export function originMergeArgv(repo: string, target: string): string[] {
+  return ["origin", "pr", "merge", target, "-R", repo, "--merge"];
+}
+
+export async function mergeOriginPr(repoDir: string, repo: string, target: string): Promise<void> {
+  await runWithMergeRetry(repoDir, originMergeArgv(repo, target));
+}
+
+async function mergeChange(repoDir: string, forgeRepo: ForgeRepo, outcome: TicketOutcome): Promise<void> {
+  const target = outcome.prNumber ? String(outcome.prNumber) : outcome.branch;
+  const argv =
+    forgeRepo.forge === "origin"
+      ? originMergeArgv(forgeRepo.slug, target)
+      : outcome.prNumber
+        ? ["gh", "pr", "merge", String(outcome.prNumber), "--merge"]
+        : null;
+  if (!argv) {
+    throw new Error("cannot merge GitHub PR without a number");
+  }
+  await runWithMergeRetry(repoDir, argv);
+}
+
+async function runWithMergeRetry(cwd: string, argv: string[]): Promise<ProcResult> {
+  let lastError = "merge failed";
+  for (let attempt = 1; attempt <= 8; attempt += 1) {
+    try {
+      return await run(cwd, argv);
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : "merge failed";
+      if (!isMergeRace(lastError) || attempt === 8) {
+        throw err;
+      }
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 150 * attempt);
+      });
+    }
+  }
+  throw new Error(lastError);
 }
 
 interface ObservedChange {

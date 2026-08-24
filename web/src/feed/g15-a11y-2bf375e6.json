@@ -1,0 +1,15 @@
+{
+  "id": "g15-a11y-2bf375e6",
+  "generation": 15,
+  "title": "Accessibility landmarks",
+  "summary": "Reduced motion, skip target, and hit-area fixes so the console is usable with keyboard and AT.",
+  "acceptedAt": "2026-08-24T09:16:53.786Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g15-a11y-2bf375e6",
+    "kind": "copy",
+    "title": "Accessibility landmarks",
+    "body": "Honor prefers-reduced-motion. Keep 44px targets on primary actions.",
+    "tone": "mint"
+  }
+}

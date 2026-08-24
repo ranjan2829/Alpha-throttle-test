@@ -1,0 +1,15 @@
+{
+  "id": "g6-polish-3cb15989",
+  "generation": 6,
+  "title": "Quality pass and mobile stack",
+  "summary": "Tightened spacing, shadows, and a one-column mobile layout so the repaired UI holds up in a screenshot.",
+  "acceptedAt": "2026-08-24T09:04:36.964Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g6-polish-3cb15989",
+    "kind": "copy",
+    "title": "Quality pass and mobile stack",
+    "body": "Last open defect. After this the agent has rebuilt the console from memory.",
+    "tone": "mint"
+  }
+}

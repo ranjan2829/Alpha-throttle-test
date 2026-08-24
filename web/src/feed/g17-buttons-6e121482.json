@@ -1,0 +1,15 @@
+{
+  "id": "g17-buttons-6e121482",
+  "generation": 17,
+  "title": "Button states",
+  "summary": "Primary and ghost now have hover, active, and disabled treatments that match the mint system.",
+  "acceptedAt": "2026-08-24T09:16:53.788Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g17-buttons-6e121482",
+    "kind": "copy",
+    "title": "Button states",
+    "body": "Disabled is wait, not invisible. Keep the mint fill.",
+    "tone": "mint"
+  }
+}

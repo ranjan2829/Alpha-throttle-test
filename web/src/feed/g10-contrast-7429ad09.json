@@ -1,0 +1,15 @@
+{
+  "id": "g10-contrast-7429ad09",
+  "generation": 10,
+  "title": "Contrast and muted text",
+  "summary": "Raised muted copy and borders so captions stay AA against the dark cards.",
+  "acceptedAt": "2026-08-24T09:16:53.783Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g10-contrast-7429ad09",
+    "kind": "copy",
+    "title": "Contrast and muted text",
+    "body": "Muted is #9aa3b5 minimum. Do not drop body text below #c2cad8.",
+    "tone": "mint"
+  }
+}

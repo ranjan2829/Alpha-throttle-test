@@ -45,3 +45,26 @@ flowchart TD
 ```
 
 At `maxDepth` Claude stops. Leaves are deterministic: one file, one Origin PR, merge-commit.
+
+---
+
+## Self-improving dashboard
+
+Gen 0 is a **broken** UI on purpose. The agent reads `web/src/memory.json`, applies the next highest-quality CSS repair, and remembers it so it does not redo or regress work.
+
+```bash
+npm --prefix web install
+npm --prefix web run dev
+# http://127.0.0.1:5173  ← broken gen 0
+npx tsx src/cli.ts dashboard-improve            # one repair
+npx tsx src/cli.ts dashboard-improve --generations 12
+```
+
+`--generations 12` keeps going after the original six gen-0 defects. When memory has no open defects the agent opens the next unpublished high-quality catalog repair (type scale, spacing, focus, contrast, tree polish, and so on) instead of dying. Pass `--stop` only when the operator wants a hard halt. Quality bar stays `highest`; `doNotRegress` grows and never restores Comic Sans or 400-ticket labels after gen 0.
+
+Planner flag (does not block the demo if no Grok key):
+
+```bash
+npx tsx src/cli.ts agent --planner grok
+# needs XAI_API_KEY or GROK_API_KEY; otherwise falls back to Claude, then deterministic
+```
