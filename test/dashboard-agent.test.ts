@@ -25,7 +25,7 @@ test("verifier rejects Comic Sans and 400-ticket copy", () => {
   memory.doNotRegress = ["Instrument Sans"];
   const bad = verifyDashboardGeneration({
     patchCss: "body { font-family: 'Comic Sans MS'; }",
-    feedJson: '{"title":"400 tickets"}',
+    feedJson: '{"title":"ship 400 tickets"}',
     memory,
   });
   assert.equal(bad.ok, false);

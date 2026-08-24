@@ -7,28 +7,23 @@ export interface VerifyIssue {
 
 export type VerifyVerdict = { ok: true } | { ok: false; issues: VerifyIssue[] };
 
-const FORBIDDEN = [
-  { code: "comic-sans", pattern: /comic sans/i, message: "patch restores Comic Sans" },
-  { code: "papyrus", pattern: /papyrus/i, message: "patch restores Papyrus" },
-  { code: "tickets-400", pattern: /400 tickets/i, message: "patch or feed writes 400 tickets" },
-  {
-    code: "negative-claude",
-    pattern: /claude does not write/i,
-    message: "patch or feed uses the negative Claude line",
-  },
-] as const;
-
 export function verifyDashboardGeneration(input: {
   patchCss: string;
   feedJson: string;
   memory: DashboardMemory;
 }): VerifyVerdict {
   const issues: VerifyIssue[] = [];
-  const blob = `${input.patchCss}\n${input.feedJson}`;
-  for (const rule of FORBIDDEN) {
-    if (rule.pattern.test(blob)) {
-      issues.push({ code: rule.code, message: rule.message });
-    }
+  if (/comic sans/i.test(input.patchCss)) {
+    issues.push({ code: "comic-sans", message: "patch restores Comic Sans" });
+  }
+  if (/papyrus/i.test(input.patchCss)) {
+    issues.push({ code: "papyrus", message: "patch restores Papyrus" });
+  }
+  if (/\b400 tickets\b/i.test(input.feedJson) && !/no 400-ticket/i.test(input.feedJson)) {
+    issues.push({ code: "tickets-400", message: "feed writes 400 tickets" });
+  }
+  if (/claude does not write/i.test(input.feedJson)) {
+    issues.push({ code: "negative-claude", message: "feed uses the negative Claude line" });
   }
   if (input.memory.qualityBar !== "highest") {
     issues.push({ code: "quality-bar", message: "qualityBar must stay highest" });

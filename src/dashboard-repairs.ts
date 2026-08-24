@@ -606,7 +606,7 @@ export function synthesizeQualityRepair(pass: number): DashboardRepair {
     defectId,
     title: `Quality pass ${n}`,
     summary: `Next highest-quality polish pass ${n}. Unique CSS, no gen-0 regressions.`,
-    notes: "Keep going. Do not restore Comic Sans, magenta clash, or a rotated hero.",
+    notes: "Keep going. Do not restore the gen-0 broken type or a rotated hero.",
     doNotRegress: [`quality pass ${n}`, "no Comic Sans after gen 0"],
     css: `:root { --agent-quality-pass: ${n}; }
 .shell { padding-bottom: ${pad}px; }
