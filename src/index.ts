@@ -7,8 +7,14 @@ export { runThrottleLoop, sliceTickets } from "./throttle/loop.ts";
 export { readClaudeApiKey, deterministicBurstSplit, parseBurstSplit } from "./claude.ts";
 export { readGrokApiKey, createGrokClient, DEFAULT_GROK_MODEL } from "./grok.ts";
 export { resolvePlanner, parsePlannerRequest } from "./planner-select.ts";
-export { applyDashboardImprovement, loadImprovements, loadMemory, emptyMemory } from "./dashboard-improve.ts";
-export { DASHBOARD_REPAIRS } from "./dashboard-repairs.ts";
+export {
+  applyDashboardImprovement,
+  loadImprovements,
+  loadMemory,
+  emptyMemory,
+  openNextQualityBacklog,
+} from "./dashboard-improve.ts";
+export { DASHBOARD_REPAIRS, unpublishedRepairs } from "./dashboard-repairs.ts";
 export { resolveAgentTarget, policyForAgentTarget } from "./agent.ts";
 export { createGate, parseCreatedChange, isMergeRace } from "./throttle/adapter.ts";
 export { learn, plannedBurst, summarizeOutcomes } from "./throttle/policy.ts";
