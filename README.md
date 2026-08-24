@@ -68,3 +68,26 @@ Planner flag (does not block the demo if no Grok key):
 npx tsx src/cli.ts agent --planner grok
 # needs XAI_API_KEY or GROK_API_KEY; otherwise falls back to Claude, then deterministic
 ```
+
+### UI repo + Vercel
+
+Dedicated **UI-only** repo. The cloud agent reads and updates **`main`**:
+
+**https://github.com/ranjan-rgb/Recursive-Agent-Dashboard**
+
+That repo is the Vite dashboard only (no harness, no Origin tickets). Publish a full snapshot:
+
+```bash
+npx tsx src/cli.ts dashboard-improve --generations 12 --publish
+npx tsx src/cli.ts dashboard-publish
+```
+
+Vercel: import **`ranjan-rgb/Recursive-Agent-Dashboard`** at [vercel.com/new](https://vercel.com/new).
+
+| setting | value |
+| --- | --- |
+| Framework | Vite |
+| Root Directory | `/` (leave empty) |
+| Production Branch | `main` |
+| Build Command | `npm run build` |
+| Output | `dist` |

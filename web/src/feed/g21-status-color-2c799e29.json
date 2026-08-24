@@ -1,0 +1,15 @@
+{
+  "id": "g21-status-color-2c799e29",
+  "generation": 21,
+  "title": "Status color semantics",
+  "summary": "Open / fixed / selected states now share one amber-mint language across banner, pills, and rows.",
+  "acceptedAt": "2026-08-24T09:34:34.319Z",
+  "worker": "dashboard-ui",
+  "widget": {
+    "id": "widget-g21-status-color-2c799e29",
+    "kind": "copy",
+    "title": "Status color semantics",
+    "body": "Amber means open work. Mint means accepted. Do not reintroduce yellow/magenta gen-0 clash.",
+    "tone": "mint"
+  }
+}

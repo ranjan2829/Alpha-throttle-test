@@ -1,5 +1,5 @@
 {
-  "generation": 20,
+  "generation": 21,
   "qualityBar": "highest",
   "defects": [
     {
@@ -121,6 +121,12 @@
       "title": "Quiet scrollbars",
       "status": "fixed",
       "notes": "Tree and memory panes get thin, dark scrollbars so overflow does not flash OS chrome."
+    },
+    {
+      "id": "status-color",
+      "title": "Status color semantics",
+      "status": "fixed",
+      "notes": "Open / fixed / selected states now share one amber-mint language across banner, pills, and rows."
     }
   ],
   "history": [
@@ -383,6 +389,19 @@
       "notes": "Keep overflow-x on the tree. Do not clip node labels.",
       "acceptedAt": "2026-08-24T09:30:53.313Z",
       "worker": "dashboard-ui"
+    },
+    {
+      "generation": 21,
+      "defectId": "status-color",
+      "title": "Status color semantics",
+      "summary": "Open / fixed / selected states now share one amber-mint language across banner, pills, and rows.",
+      "files": [
+        "patches/g21-status-color-2c799e29.css",
+        "memory.json"
+      ],
+      "notes": "Amber means open work. Mint means accepted. Do not reintroduce yellow/magenta gen-0 clash.",
+      "acceptedAt": "2026-08-24T09:34:34.319Z",
+      "worker": "dashboard-ui"
     }
   ],
   "doNotRegress": [
@@ -440,6 +459,8 @@
     "tabular mono numbers",
     "Tabular numbers",
     "thin dark scrollbars",
-    "Quiet scrollbars"
+    "Quiet scrollbars",
+    "amber open / mint fixed",
+    "Status color semantics"
   ]
 }

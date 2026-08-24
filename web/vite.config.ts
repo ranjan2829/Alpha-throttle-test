@@ -2,8 +2,6 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 
-import { applyDashboardImprovement, defaultWebSrc } from "../src/dashboard-improve.ts";
-
 const webRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(webRoot, "..");
 
@@ -20,7 +18,8 @@ function sendJson(
 function improveApi(): Plugin {
   return {
     name: "dashboard-improve-api",
-    configureServer(server: ViteDevServer) {
+    async configureServer(server: ViteDevServer) {
+      const { applyDashboardImprovement, defaultWebSrc } = await import("../src/dashboard-improve.ts");
       server.middlewares.use((req, res, next) => {
         const url = req.url ?? "";
         if (url === "/api/improve" && req.method === "POST") {
@@ -43,11 +42,11 @@ function improveApi(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [improveApi()],
+export default defineConfig(({ command }) => ({
+  plugins: command === "serve" ? [improveApi()] : [],
   server: {
     host: "127.0.0.1",
     port: 5173,
     strictPort: true,
   },
-});
+}));

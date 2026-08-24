@@ -6,6 +6,7 @@ import { decomposeGoalMaybeClaude, policyForAgentTarget, resolveAgentTarget, wri
 import { floatFlag, intFlag, parseArgs, type CliArgs } from "./args.ts";
 import { loadDotEnv } from "./claude.ts";
 import { applyDashboardImprovement, defaultFeedDir, defaultWebSrc } from "./dashboard-improve.ts";
+import { DEFAULT_UI_REPO, publishDashboardToMain } from "./dashboard-publish.ts";
 import { PlanValidationError } from "./errors.ts";
 import { parsePlannerRequest, resolvePlanner } from "./planner-select.ts";
 import { renderTree, runOrchestrator } from "./orchestrator.ts";
@@ -44,6 +45,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return commandOriginFinish(args);
     case "dashboard-improve":
       return commandDashboardImprove(args);
+    case "dashboard-publish":
+      return commandDashboardPublish(args);
     case "help":
     case "--help":
     case "-h":
@@ -457,7 +460,7 @@ function plannerFromArgs(args: CliArgs) {
   return resolved;
 }
 
-function commandDashboardImprove(args: CliArgs): number {
+async function commandDashboardImprove(args: CliArgs): Promise<number> {
   const webSrc = args.flags.get("web") ?? defaultWebSrc(process.cwd());
   const feedDir = args.flags.get("feed") ?? defaultFeedDir(process.cwd());
   const worker = args.flags.get("worker") ?? "cli-dashboard-improve";
@@ -492,6 +495,27 @@ function commandDashboardImprove(args: CliArgs): number {
     }
   }
   process.stdout.write(`memory gen ${lastGeneration} · last repair: ${lastTitle}\n`);
+  if (args.switches.has("publish") || args.flags.has("ui-repo")) {
+    return commandDashboardPublish(args, lastGeneration, lastTitle);
+  }
+  return 0;
+}
+
+async function commandDashboardPublish(
+  args: CliArgs,
+  generation = 0,
+  title = "dashboard snapshot",
+): Promise<number> {
+  const result = await publishDashboardToMain({
+    repoRoot: process.cwd(),
+    repo: args.flags.get("ui-repo") ?? DEFAULT_UI_REPO,
+    generation,
+    title,
+    dryRun: args.switches.has("dry-run"),
+  });
+  process.stdout.write(
+    `${result.committed ? "published" : "unchanged"} ${result.repo} main ${result.sha ?? ""}\n`,
+  );
   return 0;
 }
 
@@ -505,7 +529,8 @@ Usage:
   npx tsx src/cli.ts plan --goal "<goal>" --workspace .alpha/my-goal
   npx tsx src/cli.ts tree --workspace .alpha/my-goal
   npx tsx src/cli.ts smoke
-  npx tsx src/cli.ts dashboard-improve [--generations 12] [--web web/src] [--stop]
+  npx tsx src/cli.ts dashboard-improve [--generations 12] [--web web/src] [--stop] [--publish]
+  npx tsx src/cli.ts dashboard-publish [--ui-repo ranjan-rgb/Recursive-Agent-Dashboard]
   npx tsx src/cli.ts agent [--live] [--fast] [--per-minute 500] [--max 500]
       [--until-merged 100000] [--chunk 400]
       [--concurrency 32] [--forge origin]

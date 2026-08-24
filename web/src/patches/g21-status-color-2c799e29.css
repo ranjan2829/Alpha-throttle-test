@@ -1,0 +1,5 @@
+.memory-item.open { border-color: #7a5a2a; background: #16120c; }
+.memory-item.fixed { border-color: #245246; background: #0c1412; }
+.feed-item.selected { border-color: var(--amber); }
+.broken-banner { letter-spacing: -0.01em; }
+.pill { letter-spacing: 0.04em; }
