@@ -1,0 +1,15 @@
+{
+  "id": "g5-tree-ee673744",
+  "generation": 5,
+  "title": "Recursive tree and agent memory",
+  "summary": "Made the depth tree scannable and pinned the memory of every accepted repair.",
+  "acceptedAt": "2026-08-24T09:04:36.963Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g5-tree-ee673744",
+    "kind": "copy",
+    "title": "Recursive tree and agent memory",
+    "body": "Memory is the source of truth. Do not hide open defects.",
+    "tone": "mint"
+  }
+}

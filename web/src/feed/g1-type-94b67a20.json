@@ -1,0 +1,15 @@
+{
+  "id": "g1-type-94b67a20",
+  "generation": 1,
+  "title": "Readable type and color system",
+  "summary": "Replaced the broken type with a real dark palette, box-sizing, and Instrument Sans.",
+  "acceptedAt": "2026-08-24T09:04:36.961Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g1-type-94b67a20",
+    "kind": "copy",
+    "title": "Readable type and color system",
+    "body": "Highest-quality base tokens. Later patches must keep contrast and box-sizing.",
+    "tone": "mint"
+  }
+}
