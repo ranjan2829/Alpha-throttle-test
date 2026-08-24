@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit",
     "dashboard": "npm --prefix web run dev",
     "dashboard:build": "npm --prefix web run build",
-    "dashboard:improve": "tsx src/cli.ts dashboard-improve"
+    "dashboard:improve": "tsx src/cli.ts dashboard-improve",
+    "dashboard:publish": "tsx src/cli.ts dashboard-publish"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

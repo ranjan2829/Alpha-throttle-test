@@ -21,6 +21,13 @@ export {
   healRepoPatchPath,
 } from "./dashboard-pr.ts";
 export { DASHBOARD_REPAIRS, unpublishedRepairs } from "./dashboard-repairs.ts";
+export {
+  DEFAULT_UI_REPO,
+  RANJAN_RGB_UI_REPO,
+  publishDashboardToMain,
+  shouldPublishUi,
+  stageDashboardFiles,
+} from "./dashboard-publish.ts";
 export { resolveAgentTarget, policyForAgentTarget } from "./agent.ts";
 export {
   createGate,
