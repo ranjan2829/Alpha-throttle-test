@@ -59,11 +59,36 @@ npm --prefix web run dev
 npx tsx src/cli.ts dashboard-improve            # one repair
 npx tsx src/cli.ts dashboard-improve --generations 12
 npx tsx src/cli.ts dashboard-improve --pr       # one unique-file PR per generation
+npx tsx src/cli.ts dashboard-improve --publish  # apply CSS, then push UI repo main
 ```
 
 `--generations 12` keeps going after the original six gen-0 defects. When memory has no open defects the agent opens the next unpublished high-quality catalog repair (type scale, spacing, focus, contrast, tree polish, and so on) instead of dying. Pass `--stop` only when the operator wants a hard halt. Quality bar stays `highest`; `doNotRegress` grows and never restores Comic Sans or 400-ticket labels after gen 0.
 
 `--pr` (or a logged-in Origin session: live-when-forged) opens one unique-file PR per generation through the existing throttle git/adapter. Author is Ranjan S `<ranjan@allocations.com>`. Optional `--merge` merge-commits (not squash). Without forge credentials the adapter is a dry-run mock and does not invent pull-request URLs.
+
+Each heal is: apply CSS → optional unique-file PR → `publishDashboardToMain` (when `--publish`) so the dedicated UI repo **`main`** updates and Vercel can deploy.
+
+### Dedicated UI repo + Vercel
+
+The agent updates **https://github.com/ranjan2829/alpha-throttle-dashboard** on **`main`**. That is the live UI repo this login can write. `ranjan-rgb/alpha-throttle-dashboard` does not exist (`ranjan-rgb` is a user, not an org; GitHub MCP `create_repository organization=ranjan-rgb` returns 404). Constant `RANJAN_RGB_UI_REPO` documents the desired slug.
+
+To move it to ranjan-rgb, transfer the repo in GitHub Settings while logged in as ranjan2829, or create `ranjan-rgb/alpha-throttle-dashboard` as that user and set `DASHBOARD_UI_REPO`.
+
+```bash
+npx tsx src/cli.ts dashboard-improve --generations 12 --publish
+npx tsx src/cli.ts dashboard-publish
+# override: DASHBOARD_UI_REPO=ranjan-rgb/alpha-throttle-dashboard
+```
+
+Vercel: import **`ranjan2829/alpha-throttle-dashboard`** at [vercel.com/new](https://vercel.com/new).
+
+| setting | value |
+| --- | --- |
+| Framework | Vite |
+| Root Directory | `/` (leave empty) |
+| Production Branch | `main` |
+| Build Command | `npm run build` |
+| Output | `dist` |
 
 Planner flag (does not block the demo if no Grok key):
 

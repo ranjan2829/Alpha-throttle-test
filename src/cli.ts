@@ -7,6 +7,7 @@ import { floatFlag, intFlag, parseArgs, type CliArgs } from "./args.ts";
 import { loadDotEnv } from "./claude.ts";
 import { applyDashboardImprovement, defaultFeedDir, defaultWebSrc } from "./dashboard-improve.ts";
 import { detectForgeLogin, formatHealPrLine, openDashboardHealPr, resolveHealAdapter } from "./dashboard-pr.ts";
+import { DEFAULT_UI_REPO, publishDashboardToMain, shouldPublishUi } from "./dashboard-publish.ts";
 import { PlanValidationError } from "./errors.ts";
 import { parsePlannerRequest, resolvePlanner } from "./planner-select.ts";
 import { renderTree, runOrchestrator } from "./orchestrator.ts";
@@ -48,6 +49,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return commandOriginFinish(args);
     case "dashboard-improve":
       return await commandDashboardImprove(args);
+    case "dashboard-publish":
+      return commandDashboardPublish(args);
     case "help":
     case "--help":
     case "-h":
@@ -524,6 +527,18 @@ async function commandDashboardImprove(args: CliArgs): Promise<number> {
         const outcome = await openDashboardHealPr(result, adapter, { merge });
         process.stdout.write(`${formatHealPrLine(outcome)}\n`);
       }
+      if (shouldPublishUi({ publish: args.switches.has("publish"), uiRepo: args.flags.get("ui-repo") })) {
+        const published = await publishDashboardToMain({
+          repoRoot: process.cwd(),
+          repo: args.flags.get("ui-repo") ?? process.env.DASHBOARD_UI_REPO ?? DEFAULT_UI_REPO,
+          generation: result.generation.generation,
+          title: result.item.title,
+          dryRun: args.switches.has("dry-run"),
+        });
+        process.stdout.write(
+          `${published.committed ? "published" : "unchanged"} ${published.repo} main ${published.sha ?? ""}\n`,
+        );
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "dashboard-improve failed";
       if (stop && /no open defects/.test(message)) {
@@ -534,6 +549,24 @@ async function commandDashboardImprove(args: CliArgs): Promise<number> {
     }
   }
   process.stdout.write(`memory gen ${lastGeneration} · last repair: ${lastTitle}\n`);
+  return 0;
+}
+
+async function commandDashboardPublish(
+  args: CliArgs,
+  generation = 0,
+  title = "dashboard snapshot",
+): Promise<number> {
+  const result = await publishDashboardToMain({
+    repoRoot: process.cwd(),
+    repo: args.flags.get("ui-repo") ?? process.env.DASHBOARD_UI_REPO ?? DEFAULT_UI_REPO,
+    generation,
+    title,
+    dryRun: args.switches.has("dry-run"),
+  });
+  process.stdout.write(
+    `${result.committed ? "published" : "unchanged"} ${result.repo} main ${result.sha ?? ""}\n`,
+  );
   return 0;
 }
 
@@ -548,7 +581,9 @@ Usage:
   npx tsx src/cli.ts tree --workspace .alpha/my-goal
   npx tsx src/cli.ts smoke
   npx tsx src/cli.ts dashboard-improve [--generations 12] [--web web/src] [--stop]
-      [--pr] [--live] [--dry-run] [--merge] [--forge origin] [--base main]
+      [--pr] [--publish] [--ui-repo ${DEFAULT_UI_REPO}]
+      [--live] [--dry-run] [--merge] [--forge origin] [--base main]
+  npx tsx src/cli.ts dashboard-publish [--ui-repo ${DEFAULT_UI_REPO}] [--dry-run]
   npx tsx src/cli.ts agent [--live] [--fast] [--per-minute 500] [--max 500]
       [--until-merged 100000] [--chunk 400]
       [--concurrency 32] [--forge origin]
@@ -568,13 +603,15 @@ Usage:
 
 Self-improving dashboard (gen 0 is broken; the agent repairs it):
   npm --prefix web install && npm --prefix web run dev
-  npx tsx src/cli.ts dashboard-improve [--generations 12] [--pr]
+  npx tsx src/cli.ts dashboard-improve [--generations 12] [--pr] [--publish]
   # After the original 6 gen-0 defects it opens the next unpublished
   # high-quality catalog repair and keeps going. It no longer dies at 6.
   # Pass --stop to halt when memory has no open defects.
   # --pr or a logged-in Origin/forge session opens one unique-file PR
   # per generation via the throttle adapter (Ranjan S, merge-commit not squash).
-  # Without forge creds, --pr uses the dry-run mock and does not invent URLs.
+  # --publish pushes the standalone Vite snapshot to ${DEFAULT_UI_REPO} main
+  # after each heal so Vercel can deploy. Without forge creds, --pr uses
+  # the dry-run mock and does not invent URLs.
 
 Recursive agent (Origin throttle test):
   export ANTHROPIC_API_KEY=sk-...

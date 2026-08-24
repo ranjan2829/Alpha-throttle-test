@@ -4,6 +4,7 @@ import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 
 import { applyDashboardImprovement, defaultWebSrc } from "../src/dashboard-improve.ts";
 import { detectForgeLogin, openDashboardHealPr, resolveHealAdapter } from "../src/dashboard-pr.ts";
+import { DEFAULT_UI_REPO, publishDashboardToMain } from "../src/dashboard-publish.ts";
 import { DEFAULT_ORIGIN_REPO, parseRepoSlug } from "../src/throttle/forge.ts";
 
 const webRoot = dirname(fileURLToPath(import.meta.url));
@@ -42,12 +43,34 @@ function improveApi(): Plugin {
                 baseBranch: "main",
               });
               const pr = adapter ? await openDashboardHealPr(result, adapter, { merge }) : null;
+              let publish: { repo: string; committed: boolean; sha: string | null; error?: string } | null = null;
+              try {
+                const published = await publishDashboardToMain({
+                  repoRoot,
+                  repo: process.env.DASHBOARD_UI_REPO ?? DEFAULT_UI_REPO,
+                  generation: result.generation.generation,
+                  title: result.item.title,
+                });
+                publish = {
+                  repo: published.repo,
+                  committed: published.committed,
+                  sha: published.sha,
+                };
+              } catch (err) {
+                publish = {
+                  repo: process.env.DASHBOARD_UI_REPO ?? DEFAULT_UI_REPO,
+                  committed: false,
+                  sha: null,
+                  error: err instanceof Error ? err.message : "publish failed",
+                };
+              }
               sendJson(res, 200, {
                 ok: true,
                 result,
                 pr: pr
                   ? { status: pr.status, prNumber: pr.prNumber, prUrl: pr.prUrl }
                   : null,
+                publish,
               });
             } catch (err) {
               const message = err instanceof Error ? err.message : "improve failed";
