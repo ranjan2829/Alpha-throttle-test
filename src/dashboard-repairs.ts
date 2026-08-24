@@ -598,6 +598,27 @@ export function unpublishedRepairs(publishedIds: Iterable<string>): DashboardRep
   return DASHBOARD_REPAIRS.filter((repair) => !used.has(repair.defectId));
 }
 
+export function synthesizeQualityRepair(pass: number): DashboardRepair {
+  const n = Math.max(1, Math.floor(pass));
+  const defectId = `gen-quality-${n}`;
+  const pad = 64 + (n % 24);
+  return {
+    defectId,
+    title: `Quality pass ${n}`,
+    summary: `Next highest-quality polish pass ${n}. Unique CSS, no gen-0 regressions.`,
+    notes: "Keep going. Do not restore Comic Sans, magenta clash, or a rotated hero.",
+    doNotRegress: [`quality pass ${n}`, "no Comic Sans after gen 0"],
+    css: `:root { --agent-quality-pass: ${n}; }
+.shell { padding-bottom: ${pad}px; }
+.panel, .widget, .kpi { border-radius: ${16 + (n % 4)}px; }
+`,
+  };
+}
+
 export function repairForDefect(defectId: string): DashboardRepair | null {
-  return DASHBOARD_REPAIRS.find((repair) => repair.defectId === defectId) ?? null;
+  const catalog = DASHBOARD_REPAIRS.find((repair) => repair.defectId === defectId);
+  if (catalog) return catalog;
+  const match = /^gen-quality-(\d+)$/.exec(defectId);
+  if (!match?.[1]) return null;
+  return synthesizeQualityRepair(Number(match[1]));
 }

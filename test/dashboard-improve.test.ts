@@ -12,7 +12,7 @@ import {
   uniqueImprovementId,
 } from "../src/dashboard-improve.ts";
 import { emptyMemory, OPENING_DEFECTS, saveMemory } from "../src/dashboard-memory.ts";
-import { DASHBOARD_REPAIRS } from "../src/dashboard-repairs.ts";
+import { DASHBOARD_REPAIRS, synthesizeQualityRepair } from "../src/dashboard-repairs.ts";
 
 function tempWebSrc(): string {
   const root = mkdtempSync(join(tmpdir(), "alpha-dash-"));
@@ -114,4 +114,17 @@ test("twelve generations keep applying highest-quality repairs", () => {
     assert.doesNotMatch(repair.css, /Comic Sans/i);
     assert.doesNotMatch(repair.css, /400 tickets/i);
   }
+});
+
+test("synthesizes the next quality pass after the catalog is used up", () => {
+  const webSrc = tempWebSrc();
+  for (let i = 0; i < DASHBOARD_REPAIRS.length; i += 1) {
+    applyDashboardImprovement({ webSrc, entropy: `c${i}` });
+  }
+  const extra = applyDashboardImprovement({ webSrc, entropy: "syn" });
+  const expected = synthesizeQualityRepair(DASHBOARD_REPAIRS.length + 1);
+  assert.equal(extra.memory.generation, DASHBOARD_REPAIRS.length + 1);
+  assert.equal(extra.item.title, expected.title);
+  assert.match(extra.patchPath, /gen-quality-/);
+  assert.doesNotMatch(readFileSync(extra.patchPath, "utf8"), /Comic Sans/i);
 });

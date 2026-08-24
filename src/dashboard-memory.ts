@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { unpublishedRepairs } from "./dashboard-repairs.ts";
+import { synthesizeQualityRepair, unpublishedRepairs } from "./dashboard-repairs.ts";
 import type { DashboardDefect, DashboardMemory, MemoryEntry } from "./dashboard-types.ts";
 import { isJsonObject, parseJsonObject, requireInt, requireString } from "./json.ts";
 
@@ -82,8 +82,8 @@ export function publishedRepairIds(memory: DashboardMemory): string[] {
 
 /** Open the next unpublished catalog repair so the agent keeps doing highest-quality work. */
 export function openNextQualityBacklog(memory: DashboardMemory): DashboardMemory {
-  const next = unpublishedRepairs(publishedRepairIds(memory))[0];
-  if (!next) return memory;
+  const next =
+    unpublishedRepairs(publishedRepairIds(memory))[0] ?? synthesizeQualityRepair(memory.generation + 1);
   return {
     ...memory,
     qualityBar: "highest",
