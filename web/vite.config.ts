@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 
-import { applyDashboardImprovement, defaultFeedDir } from "../src/dashboard-improve.ts";
+import { applyDashboardImprovement, defaultWebSrc } from "../src/dashboard-improve.ts";
 
 const webRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(webRoot, "..");
@@ -26,7 +26,7 @@ function improveApi(): Plugin {
         if (url === "/api/improve" && req.method === "POST") {
           try {
             const result = applyDashboardImprovement({
-              feedDir: defaultFeedDir(repoRoot),
+              webSrc: defaultWebSrc(repoRoot),
               worker: "dashboard-ui",
               planner: "claude",
             });

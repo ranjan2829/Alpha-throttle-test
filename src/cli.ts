@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { decomposeGoalMaybeClaude, policyForAgentTarget, resolveAgentTarget, writeAgentTree } from "./agent.ts";
 import { floatFlag, intFlag, parseArgs, type CliArgs } from "./args.ts";
 import { loadDotEnv } from "./claude.ts";
-import { applyDashboardImprovement, defaultFeedDir } from "./dashboard-improve.ts";
+import { applyDashboardImprovement, defaultFeedDir, defaultWebSrc } from "./dashboard-improve.ts";
 import { PlanValidationError } from "./errors.ts";
 import { parsePlannerRequest, resolvePlanner } from "./planner-select.ts";
 import { renderTree, runOrchestrator } from "./orchestrator.ts";
@@ -458,20 +458,32 @@ function plannerFromArgs(args: CliArgs) {
 }
 
 function commandDashboardImprove(args: CliArgs): number {
+  const webSrc = args.flags.get("web") ?? defaultWebSrc(process.cwd());
   const feedDir = args.flags.get("feed") ?? defaultFeedDir(process.cwd());
   const worker = args.flags.get("worker") ?? "cli-dashboard-improve";
-  const entropy = args.flags.get("id") ?? undefined;
+  const generations = intFlag(args, "generations", 1);
   const planner = parsePlannerRequest(args.flags.get("planner"), args.switches);
-  const result = applyDashboardImprovement({
-    feedDir,
-    worker,
-    planner: planner === "auto" ? "claude" : planner,
-    ...(entropy ? { entropy } : {}),
-  });
-  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  process.stdout.write(
-    `accepted generation ${result.generation.generation} → ${result.item.title} (${result.path})\n`,
-  );
+  let lastTitle = "";
+  let lastGeneration = 0;
+  for (let step = 0; step < generations; step += 1) {
+    const entropy = args.flags.get("id") ? `${args.flags.get("id")}${step}` : undefined;
+    const result = applyDashboardImprovement({
+      webSrc,
+      feedDir,
+      worker,
+      planner: planner === "auto" ? "claude" : planner,
+      ...(entropy ? { entropy } : {}),
+    });
+    lastTitle = result.item.title;
+    lastGeneration = result.generation.generation;
+    process.stdout.write(
+      `accepted generation ${result.generation.generation} → ${result.item.title} (${result.patchPath})\n`,
+    );
+    if (result.memory.defects.every((defect) => defect.status === "fixed")) {
+      break;
+    }
+  }
+  process.stdout.write(`memory gen ${lastGeneration} · last repair: ${lastTitle}\n`);
   return 0;
 }
 
@@ -485,7 +497,7 @@ Usage:
   npx tsx src/cli.ts plan --goal "<goal>" --workspace .alpha/my-goal
   npx tsx src/cli.ts tree --workspace .alpha/my-goal
   npx tsx src/cli.ts smoke
-  npx tsx src/cli.ts dashboard-improve [--feed web/src/feed] [--id unique-token]
+  npx tsx src/cli.ts dashboard-improve [--generations 1] [--web web/src]
   npx tsx src/cli.ts agent [--live] [--fast] [--per-minute 500] [--max 500]
       [--until-merged 100000] [--chunk 400]
       [--concurrency 32] [--forge origin]
@@ -501,9 +513,9 @@ Usage:
   npx tsx src/cli.ts throttle --live --max 3 --rate 1 --forge origin
       [--repo allocations/Alpha-throttle-test] [--no-merge]
 
-Self-improving dashboard:
+Self-improving dashboard (gen 0 is broken; the agent repairs it):
   npm --prefix web install && npm --prefix web run dev
-  npx tsx src/cli.ts dashboard-improve
+  npx tsx src/cli.ts dashboard-improve [--generations 3]
 
 Recursive agent (Origin throttle test):
   export ANTHROPIC_API_KEY=sk-...

@@ -50,13 +50,14 @@ At `maxDepth` Claude stops. Leaves are deterministic: one file, one Origin PR, m
 
 ## Self-improving dashboard
 
-Demo console for the recursive agent. Seeded with the Origin 10k stats above so it looks live offline. Each accepted worker handoff writes a **unique** widget file under `web/src/feed/` and bumps the generation badge.
+Gen 0 is a **broken** UI on purpose. The agent reads `web/src/memory.json`, applies the next highest-quality CSS repair, and remembers it so it does not redo or regress work.
 
 ```bash
 npm --prefix web install
 npm --prefix web run dev
-# http://127.0.0.1:5173
-npx tsx src/cli.ts dashboard-improve
+# http://127.0.0.1:5173  ← broken gen 0
+npx tsx src/cli.ts dashboard-improve            # one repair
+npx tsx src/cli.ts dashboard-improve --generations 6
 ```
 
 Planner flag (does not block the demo if no Grok key):

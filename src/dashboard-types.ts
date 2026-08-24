@@ -63,3 +63,31 @@ export interface DashboardGeneration {
   planner: BurstPlanner;
   itemCount: number;
 }
+
+export type DefectStatus = "open" | "fixed";
+
+export interface DashboardDefect {
+  id: string;
+  title: string;
+  status: DefectStatus;
+  notes: string;
+}
+
+export interface MemoryEntry {
+  generation: number;
+  defectId: string;
+  title: string;
+  summary: string;
+  files: string[];
+  notes: string;
+  acceptedAt: string;
+  worker: string;
+}
+
+export interface DashboardMemory {
+  generation: number;
+  qualityBar: "highest";
+  defects: DashboardDefect[];
+  history: MemoryEntry[];
+  doNotRegress: string[];
+}

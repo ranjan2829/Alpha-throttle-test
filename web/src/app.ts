@@ -1,10 +1,12 @@
 import { renderApp } from "./render.ts";
 import { loadBundledImprovements } from "./feed.ts";
+import memorySeed from "./memory.json";
 import { AGENT_TREE, ORIGIN_STATS } from "./seed.ts";
-import type { ImproveApiResponse, ImprovementItem } from "./types.ts";
+import type { DashboardMemory, ImproveApiResponse, ImprovementItem } from "./types.ts";
 
 export interface DashboardState {
   items: ImprovementItem[];
+  memory: DashboardMemory;
   selectedId: string | null;
   busy: boolean;
   notice: string | null;
@@ -12,11 +14,16 @@ export interface DashboardState {
 
 export function initialState(): DashboardState {
   const items = loadBundledImprovements();
+  const memory = memorySeed as DashboardMemory;
   return {
     items,
+    memory,
     selectedId: items.at(-1)?.id ?? null,
     busy: false,
-    notice: null,
+    notice:
+      memory.generation === 0
+        ? "Gen 0 is broken on purpose. Repair next defect writes CSS and remembers it."
+        : null,
   };
 }
 
@@ -28,6 +35,7 @@ export function mount(root: HTMLElement): void {
       stats: ORIGIN_STATS,
       tree: AGENT_TREE,
       items: state.items,
+      memory: state.memory,
       selectedId: state.selectedId,
       busy: state.busy,
       notice: state.notice,
@@ -53,7 +61,7 @@ export function mount(root: HTMLElement): void {
 
   const improve = async (): Promise<void> => {
     if (state.busy) return;
-    state = { ...state, busy: true, notice: "Worker applying a unique frontend upgrade…" };
+    state = { ...state, busy: true, notice: "Agent reading memory and applying the next highest-quality repair…" };
     paint();
     try {
       const response = await fetch("/api/improve", { method: "POST" });
@@ -63,18 +71,6 @@ export function mount(root: HTMLElement): void {
           ...state,
           busy: false,
           notice: payload.error ?? "Improve API failed. Use npx tsx src/cli.ts dashboard-improve",
-        };
-        paint();
-        return;
-      }
-      const item = payload.result?.item;
-      if (item && !state.items.some((row) => row.id === item.id)) {
-        const items = [...state.items, item].sort((a, b) => a.generation - b.generation);
-        state = {
-          items,
-          selectedId: item.id,
-          busy: false,
-          notice: `Accepted gen ${item.generation}: ${item.title}`,
         };
         paint();
         return;

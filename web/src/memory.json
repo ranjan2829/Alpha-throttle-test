@@ -1,0 +1,44 @@
+{
+  "generation": 0,
+  "qualityBar": "highest",
+  "defects": [
+    {
+      "id": "type",
+      "title": "Unreadable type and broken colors",
+      "status": "open",
+      "notes": "Comic Sans, clashing yellow/magenta, no box-sizing."
+    },
+    {
+      "id": "header",
+      "title": "Header overlaps and floats apart",
+      "status": "open",
+      "notes": "Brand, generation chip, and Improve button sit on top of each other."
+    },
+    {
+      "id": "layout",
+      "title": "No page layout",
+      "status": "open",
+      "notes": "Shell is too wide, hero is rotated, KPIs float and overflow."
+    },
+    {
+      "id": "cards",
+      "title": "Pipeline and widgets have no structure",
+      "status": "open",
+      "notes": "Steps and worker cards are raw blocks with no rhythm."
+    },
+    {
+      "id": "tree",
+      "title": "Depth tree and memory are unusable",
+      "status": "open",
+      "notes": "Nested nodes collapse; memory of prior work is easy to miss."
+    },
+    {
+      "id": "polish",
+      "title": "No quality pass or mobile layout",
+      "status": "open",
+      "notes": "No spacing system, no responsive stack, no visual hierarchy."
+    }
+  ],
+  "history": [],
+  "doNotRegress": []
+}

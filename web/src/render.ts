@@ -1,4 +1,4 @@
-import type { ImprovementItem, OriginLiveStats, TreeNode, WidgetTone } from "./types.ts";
+import type { DashboardMemory, ImprovementItem, OriginLiveStats, TreeNode, WidgetTone } from "./types.ts";
 import { PIPELINE } from "./seed.ts";
 
 export function formatInt(n: number): string {
@@ -17,15 +17,18 @@ export function renderApp(options: {
   stats: OriginLiveStats;
   tree: TreeNode;
   items: ImprovementItem[];
+  memory: DashboardMemory;
   selectedId: string | null;
   busy: boolean;
   notice: string | null;
 }): string {
-  const generation = options.items.reduce((max, item) => Math.max(max, item.generation), 0);
+  const generation = options.memory.generation;
   const widgets = options.items.map((item) => item.widget);
+  const openCount = options.memory.defects.filter((defect) => defect.status === "open").length;
   return `
     <div class="shell">
-      ${renderHeader(generation, options.items.length, options.busy, options.notice)}
+      ${renderBrokenBanner(generation, openCount)}
+      ${renderHeader(generation, options.memory.history.length, options.busy, options.notice)}
       ${renderHero(options.stats, generation)}
       <section class="kpis" aria-label="Origin 10k stats">
         ${kpi("Tried", formatInt(options.stats.tried), "tickets")}
@@ -83,19 +86,22 @@ export function renderApp(options: {
           </header>
           <div class="tree">${renderTree(options.tree)}</div>
         </section>
-        <section class="panel feed-panel" aria-label="Improvement feed">
+        <section class="panel feed-panel" aria-label="Agent memory">
           <header class="panel-head">
             <div>
-              <p class="eyebrow">Accepted handoffs</p>
-              <h2>Generation feed</h2>
+              <p class="eyebrow">Agent memory</p>
+              <h2>What it already built</h2>
             </div>
-            <button class="ghost" data-action="improve" ${options.busy ? "disabled" : ""}>Accept next worker</button>
+            <button class="ghost" data-action="improve" ${options.busy ? "disabled" : ""}>Repair next defect</button>
           </header>
+          <ol class="memory">
+            ${options.memory.defects.map((defect) => renderDefect(defect)).join("")}
+          </ol>
           <ol class="feed">
-            ${options.items
+            ${options.memory.history
               .slice()
               .reverse()
-              .map((item) => renderFeedItem(item, options.selectedId === item.id))
+              .map((entry) => renderMemoryEntry(entry, options.selectedId === `g${entry.generation}`))
               .join("")}
           </ol>
         </section>
@@ -107,6 +113,40 @@ export function renderApp(options: {
   `;
 }
 
+function renderBrokenBanner(generation: number, openCount: number): string {
+  if (generation > 0 && openCount === 0) {
+    return `<p class="broken-banner" role="status">Generation ${generation} · memory complete · every open defect has a highest-quality repair.</p>`;
+  }
+  return `<p class="broken-banner" role="status">Generation ${generation} · ${openCount} open defects · gen 0 starts broken so the agent has work.</p>`;
+}
+
+function renderDefect(defect: DashboardMemory["defects"][number]): string {
+  return `
+    <li class="memory-item ${defect.status}">
+      <div class="feed-meta">
+        <span class="pill">${escapeHtml(defect.status)}</span>
+        <span>${escapeHtml(defect.id)}</span>
+      </div>
+      <h3>${escapeHtml(defect.title)}</h3>
+      <p>${escapeHtml(defect.notes)}</p>
+    </li>
+  `;
+}
+
+function renderMemoryEntry(entry: DashboardMemory["history"][number], selected: boolean): string {
+  return `
+    <li class="feed-item ${selected ? "selected" : ""}" data-item="g${entry.generation}">
+      <div class="feed-meta">
+        <span class="pill">gen ${entry.generation}</span>
+        <time datetime="${escapeHtml(entry.acceptedAt)}">${escapeHtml(entry.acceptedAt.slice(0, 19).replace("T", " "))}Z</time>
+      </div>
+      <h3>${escapeHtml(entry.title)}</h3>
+      <p>${escapeHtml(entry.summary)}</p>
+      <p class="worker">memory ${escapeHtml(entry.files.join(" · "))}</p>
+    </li>
+  `;
+}
+
 function renderHeader(generation: number, itemCount: number, busy: boolean, notice: string | null): string {
   return `
     <header class="top">
@@ -114,7 +154,7 @@ function renderHeader(generation: number, itemCount: number, busy: boolean, noti
         <span class="mark">α</span>
         <div>
           <p class="brand-kicker">Alpha Throttle</p>
-          <h1>Self-improving agent console</h1>
+          <h1>Broken dashboard · agent builds this</h1>
         </div>
       </div>
       <div class="top-meta">
@@ -124,7 +164,7 @@ function renderHeader(generation: number, itemCount: number, busy: boolean, noti
           <span class="gen-ver">v0.${generation}.0 · ${itemCount} handoffs</span>
         </div>
         <button class="primary" data-action="improve" ${busy ? "disabled" : ""}>
-          ${busy ? "Applying…" : "Improve dashboard"}
+          ${busy ? "Repairing…" : "Let the agent repair"}
         </button>
       </div>
       ${notice ? `<p class="notice" role="status">${escapeHtml(notice)}</p>` : ""}
@@ -136,13 +176,12 @@ function renderHero(stats: OriginLiveStats, generation: number): string {
   return `
     <section class="hero">
       <div>
-        <p class="eyebrow">Continuously improving</p>
-        <h2>A dashboard the recursive agent can patch.</h2>
+        <p class="eyebrow">Generation ${generation}</p>
+        <h2>${generation === 0 ? "This UI is broken on purpose." : "The agent is rebuilding this from memory."}</h2>
         <p class="lede">
-          Claude is the planner. Grok 4.6 is an optional planner with the same JSON split.
-          Each accepted worker handoff writes a unique widget and bumps generation
-          <strong>${generation}</strong>. Seeded from the live Origin 10k run so the demo
-          works offline.
+          Claude plans the next highest-quality repair. It reads memory so it does not
+          redo or regress prior work. Leaves apply real CSS. Seeded Origin 10k numbers
+          stay so the demo has something to dress.
         </p>
       </div>
       <dl class="hero-facts">
