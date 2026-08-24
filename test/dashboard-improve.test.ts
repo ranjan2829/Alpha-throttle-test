@@ -11,7 +11,7 @@ import {
   loadMemory,
   uniqueImprovementId,
 } from "../src/dashboard-improve.ts";
-import { emptyMemory, saveMemory } from "../src/dashboard-memory.ts";
+import { emptyMemory, OPENING_DEFECTS, saveMemory } from "../src/dashboard-memory.ts";
 import { DASHBOARD_REPAIRS } from "../src/dashboard-repairs.ts";
 
 function tempWebSrc(): string {
@@ -70,15 +70,48 @@ test("applyDashboardImprovement repairs the next open defect and remembers it", 
   assert.match(index, /g2-header-bbbb\.css/);
 });
 
-test("memory stops the agent when every defect is fixed", () => {
+test("opens next quality backlog instead of dying", () => {
   const webSrc = tempWebSrc();
-  for (let i = 0; i < DASHBOARD_REPAIRS.length; i += 1) {
+  for (let i = 0; i < OPENING_DEFECTS.length; i += 1) {
     applyDashboardImprovement({ webSrc, entropy: `e${i}` });
   }
-  const memory = loadMemory(join(webSrc, "memory.json"));
-  assert.equal(memory.defects.every((defect) => defect.status === "fixed"), true);
+  const afterOpening = loadMemory(join(webSrc, "memory.json"));
+  assert.equal(afterOpening.defects.every((defect) => defect.status === "fixed"), true);
+  assert.equal(afterOpening.defects.length, OPENING_DEFECTS.length);
+  assert.ok(DASHBOARD_REPAIRS.length > OPENING_DEFECTS.length);
+
+  const next = applyDashboardImprovement({ webSrc, entropy: "backlog" });
+  assert.equal(next.memory.qualityBar, "highest");
+  assert.equal(next.memory.generation, OPENING_DEFECTS.length + 1);
+  assert.equal(next.memory.defects.length, OPENING_DEFECTS.length + 1);
+  assert.equal(next.item.title, DASHBOARD_REPAIRS[OPENING_DEFECTS.length]?.title);
+  assert.ok(next.memory.doNotRegress.length > afterOpening.doNotRegress.length);
+  const css = readFileSync(next.patchPath, "utf8");
+  assert.doesNotMatch(css, /Comic Sans/i);
+  assert.doesNotMatch(css, /400 tickets/i);
+  assert.doesNotMatch(css, /Papyrus/i);
+
   assert.throws(
-    () => applyDashboardImprovement({ webSrc, entropy: "extra" }),
-    /no open defects/,
+    () => applyDashboardImprovement({ webSrc, entropy: "halt", stop: true }),
+    /no open defects|operator requested stop/,
   );
+});
+
+test("twelve generations keep applying highest-quality repairs", () => {
+  const webSrc = tempWebSrc();
+  assert.ok(DASHBOARD_REPAIRS.length >= 12);
+  for (let i = 0; i < 12; i += 1) {
+    applyDashboardImprovement({ webSrc, entropy: `g${i}` });
+  }
+  const memory = loadMemory(join(webSrc, "memory.json"));
+  assert.equal(memory.generation, 12);
+  assert.equal(memory.history.length, 12);
+  assert.equal(memory.qualityBar, "highest");
+  assert.ok(memory.doNotRegress.length >= 12);
+  assert.ok(memory.doNotRegress.includes("no Comic Sans after gen 0"));
+  assert.ok(memory.doNotRegress.includes("no 400-ticket labels"));
+  for (const repair of DASHBOARD_REPAIRS) {
+    assert.doesNotMatch(repair.css, /Comic Sans/i);
+    assert.doesNotMatch(repair.css, /400 tickets/i);
+  }
 });

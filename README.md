@@ -57,8 +57,10 @@ npm --prefix web install
 npm --prefix web run dev
 # http://127.0.0.1:5173  ← broken gen 0
 npx tsx src/cli.ts dashboard-improve            # one repair
-npx tsx src/cli.ts dashboard-improve --generations 6
+npx tsx src/cli.ts dashboard-improve --generations 12
 ```
+
+`--generations 12` keeps going after the original six gen-0 defects. When memory has no open defects the agent opens the next unpublished high-quality catalog repair (type scale, spacing, focus, contrast, tree polish, and so on) instead of dying. Pass `--stop` only when the operator wants a hard halt. Quality bar stays `highest`; `doNotRegress` grows and never restores Comic Sans or 400-ticket labels after gen 0.
 
 Planner flag (does not block the demo if no Grok key):
 

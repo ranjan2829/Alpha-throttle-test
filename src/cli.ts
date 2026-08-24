@@ -463,24 +463,32 @@ function commandDashboardImprove(args: CliArgs): number {
   const worker = args.flags.get("worker") ?? "cli-dashboard-improve";
   const generations = intFlag(args, "generations", 1);
   const planner = parsePlannerRequest(args.flags.get("planner"), args.switches);
+  const stop = args.switches.has("stop");
   let lastTitle = "";
   let lastGeneration = 0;
   for (let step = 0; step < generations; step += 1) {
     const entropy = args.flags.get("id") ? `${args.flags.get("id")}${step}` : undefined;
-    const result = applyDashboardImprovement({
-      webSrc,
-      feedDir,
-      worker,
-      planner: planner === "auto" ? "claude" : planner,
-      ...(entropy ? { entropy } : {}),
-    });
-    lastTitle = result.item.title;
-    lastGeneration = result.generation.generation;
-    process.stdout.write(
-      `accepted generation ${result.generation.generation} → ${result.item.title} (${result.patchPath})\n`,
-    );
-    if (result.memory.defects.every((defect) => defect.status === "fixed")) {
-      break;
+    try {
+      const result = applyDashboardImprovement({
+        webSrc,
+        feedDir,
+        worker,
+        planner: planner === "auto" ? "claude" : planner,
+        stop,
+        ...(entropy ? { entropy } : {}),
+      });
+      lastTitle = result.item.title;
+      lastGeneration = result.generation.generation;
+      process.stdout.write(
+        `accepted generation ${result.generation.generation} → ${result.item.title} (${result.patchPath})\n`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "dashboard-improve failed";
+      if (stop && /no open defects/.test(message)) {
+        process.stdout.write(`stopped: operator --stop after gen ${lastGeneration}\n`);
+        return 0;
+      }
+      throw err;
     }
   }
   process.stdout.write(`memory gen ${lastGeneration} · last repair: ${lastTitle}\n`);
@@ -497,7 +505,7 @@ Usage:
   npx tsx src/cli.ts plan --goal "<goal>" --workspace .alpha/my-goal
   npx tsx src/cli.ts tree --workspace .alpha/my-goal
   npx tsx src/cli.ts smoke
-  npx tsx src/cli.ts dashboard-improve [--generations 1] [--web web/src]
+  npx tsx src/cli.ts dashboard-improve [--generations 12] [--web web/src] [--stop]
   npx tsx src/cli.ts agent [--live] [--fast] [--per-minute 500] [--max 500]
       [--until-merged 100000] [--chunk 400]
       [--concurrency 32] [--forge origin]
@@ -515,7 +523,10 @@ Usage:
 
 Self-improving dashboard (gen 0 is broken; the agent repairs it):
   npm --prefix web install && npm --prefix web run dev
-  npx tsx src/cli.ts dashboard-improve [--generations 3]
+  npx tsx src/cli.ts dashboard-improve [--generations 12]
+  # After the original 6 gen-0 defects it opens the next unpublished
+  # high-quality catalog repair and keeps going. It no longer dies at 6.
+  # Pass --stop to halt when memory has no open defects.
 
 Recursive agent (Origin throttle test):
   export ANTHROPIC_API_KEY=sk-...
