@@ -21,7 +21,7 @@ function initRepo(): string {
 
 test("resolveGitIdentity defaults to ranjan@allocations.com", () => {
   assert.deepEqual(resolveGitIdentity({}), {
-    name: "Ranjan S",
+    name: "ranjan-rgb",
     email: "ranjan@allocations.com",
   });
   assert.deepEqual(
@@ -44,7 +44,7 @@ test("writeUniqueCommit stamps the allocations email", async () => {
     cwd: repo,
     encoding: "utf8",
   }).trim();
-  assert.equal(author, "Ranjan S <ranjan@allocations.com>");
+  assert.equal(author, "ranjan-rgb <ranjan@allocations.com>");
 });
 
 test("writeUniqueCommit is safe under concurrency", async () => {

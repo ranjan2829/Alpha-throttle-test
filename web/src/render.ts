@@ -188,7 +188,7 @@ function renderHero(stats: OriginLiveStats, generation: number): string {
         <div><dt>Status</dt><dd>${escapeHtml(stats.status)}</dd></div>
         <div><dt>Forge</dt><dd>${escapeHtml(stats.forge)}</dd></div>
         <div><dt>Measured</dt><dd>23 Aug 2026</dd></div>
-        <div><dt>Author</dt><dd>Ranjan S</dd></div>
+        <div><dt>Author</dt><dd>ranjan-rgb</dd></div>
       </dl>
     </section>
   `;

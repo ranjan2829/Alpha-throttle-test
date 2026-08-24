@@ -6,6 +6,7 @@ import {
   type ApplyImprovementResult,
 } from "./dashboard-improve.ts";
 import { DEFAULT_UI_REPO, publishDashboardToMain, type PublishDashboardResult } from "./dashboard-publish.ts";
+import { openDashboardUiPr, shouldOpenUiPr, type UiPrResult } from "./dashboard-ui-pr.ts";
 import { verifyDashboardGeneration, type VerifyVerdict } from "./dashboard-verify.ts";
 import type { BurstPlanner } from "./claude.ts";
 
@@ -14,6 +15,7 @@ export interface DashboardAgentOptions {
   generations?: number;
   stop?: boolean;
   publish?: boolean;
+  pr?: boolean;
   uiRepo?: string;
   dryRun?: boolean;
   webSrc?: string;
@@ -23,6 +25,7 @@ export interface DashboardAgentOptions {
   now?: () => string;
   improve?: (options: ApplyImprovementOptions) => ApplyImprovementResult;
   publishToMain?: typeof publishDashboardToMain;
+  openPr?: typeof openDashboardUiPr;
   verify?: typeof verifyDashboardGeneration;
 }
 
@@ -35,6 +38,9 @@ export interface DashboardAgentStep {
   publishRepo: string;
   publishSha: string | null;
   publishError: string | null;
+  prOpened: boolean;
+  prUrl: string | null;
+  prError: string | null;
 }
 
 export interface DashboardAgentResult {
@@ -67,6 +73,7 @@ export async function runDashboardAgent(options: DashboardAgentOptions): Promise
       throw new Error(`verifier rejected gen ${result.generation.generation}: ${detail}`);
     }
     const published = await maybePublish(publish, options, repo, result);
+    const pr = await maybeOpenPr(options, repo, result);
     steps.push({
       generation: result.generation.generation,
       title: result.item.title,
@@ -76,6 +83,9 @@ export async function runDashboardAgent(options: DashboardAgentOptions): Promise
       publishRepo: repo,
       publishSha: published.sha,
       publishError: published.error,
+      prOpened: pr.opened,
+      prUrl: pr.url,
+      prError: pr.error,
     });
   }
 
@@ -118,5 +128,34 @@ async function maybePublish(
   } catch (err) {
     const message = err instanceof Error ? err.message : "publish failed";
     return { committed: false, sha: null, error: message };
+  }
+}
+
+async function maybeOpenPr(
+  options: DashboardAgentOptions,
+  repo: string,
+  result: ApplyImprovementResult,
+): Promise<UiPrResult> {
+  const skipped: UiPrResult = {
+    opened: false,
+    number: null,
+    url: null,
+    branch: "",
+    path: "",
+    sha: null,
+    error: null,
+  };
+  const prFlag: { pr?: boolean; dryRun?: boolean } = {};
+  if (options.pr === true) prFlag.pr = true;
+  if (options.dryRun === true) prFlag.dryRun = true;
+  if (!shouldOpenUiPr(prFlag)) {
+    return skipped;
+  }
+  const open = options.openPr ?? openDashboardUiPr;
+  try {
+    return await open(result, { repo, dryRun: options.dryRun === true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "open UI PR failed";
+    return { ...skipped, error: message };
   }
 }

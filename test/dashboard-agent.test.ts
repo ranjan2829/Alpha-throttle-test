@@ -37,11 +37,13 @@ test("verifier rejects Comic Sans and 400-ticket copy", () => {
 test("runDashboardAgent applies, verifies, and dry-publishes to ranjan-rgb", async () => {
   const webSrc = tempWebSrc();
   const publishes: string[] = [];
+  const prs: string[] = [];
   const result = await runDashboardAgent({
     repoRoot: mkdtempSync(join(tmpdir(), "alpha-root-")),
     webSrc,
     generations: 2,
     publish: true,
+    pr: true,
     dryRun: true,
     uiRepo: DEFAULT_UI_REPO,
     worker: "test-agent",
@@ -56,6 +58,18 @@ test("runDashboardAgent applies, verifies, and dry-publishes to ranjan-rgb", asy
         files: 8,
       };
     },
+    openPr: async (applied, options = {}) => {
+      prs.push(options.repo ?? DEFAULT_UI_REPO);
+      return {
+        opened: false,
+        number: null,
+        url: `dry-run://ui-pr/${applied.item.id}`,
+        branch: `cursor/dashboard-heal-${applied.item.id}-ec34`,
+        path: `src/patches/${applied.item.id}.css`,
+        sha: null,
+        error: null,
+      };
+    },
   });
   assert.equal(result.repo, "ranjan-rgb/Recursive-Agent-Dashboard");
   assert.equal(result.steps.length, 2);
@@ -66,6 +80,11 @@ test("runDashboardAgent applies, verifies, and dry-publishes to ranjan-rgb", asy
     "ranjan-rgb/Recursive-Agent-Dashboard",
     "ranjan-rgb/Recursive-Agent-Dashboard",
   ]);
+  assert.deepEqual(prs, [
+    "ranjan-rgb/Recursive-Agent-Dashboard",
+    "ranjan-rgb/Recursive-Agent-Dashboard",
+  ]);
+  assert.match(result.steps[0]?.prUrl ?? "", /dry-run:\/\/ui-pr\//);
 });
 
 test("runDashboardAgent keeps a publish failure and continues", async () => {

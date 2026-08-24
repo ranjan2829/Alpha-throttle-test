@@ -208,6 +208,7 @@ async function commandDashboardAgent(args: CliArgs): Promise<number> {
     generations: intFlag(args, "generations", 12),
     stop: args.switches.has("stop"),
     publish: !args.switches.has("no-publish"),
+    pr: !args.switches.has("no-pr"),
     uiRepo: args.flags.get("ui-repo") ?? DEFAULT_UI_REPO,
     dryRun: args.switches.has("dry-run"),
     worker: args.flags.get("worker") ?? "dashboard-agent",
@@ -220,8 +221,14 @@ async function commandDashboardAgent(args: CliArgs): Promise<number> {
         : step.published
           ? `published ${step.publishRepo} ${step.publishSha ?? ""}`
           : "local";
+    const pr =
+      step.prError !== null
+        ? `pr-failed ${step.prError}`
+        : step.prUrl
+          ? `pr ${step.prUrl}`
+          : "no-pr";
     process.stdout.write(
-      `gen ${step.generation} verified → ${step.title} (${step.patchPath}) ${publish}\n`,
+      `gen ${step.generation} verified → ${step.title} (${step.patchPath}) ${publish} ${pr}\n`,
     );
   }
   process.stdout.write(
@@ -566,9 +573,9 @@ Usage:
   npx tsx src/cli.ts plan --goal "<goal>" --workspace .alpha/my-goal
   npx tsx src/cli.ts tree --workspace .alpha/my-goal
   npx tsx src/cli.ts smoke
-  npx tsx src/cli.ts agent --dashboard [--generations 12] [--publish] [--stop]
+  npx tsx src/cli.ts agent --dashboard [--generations 12] [--publish] [--no-pr] [--stop]
       [--ui-repo ranjan-rgb/Recursive-Agent-Dashboard]
-  npx tsx src/cli.ts dashboard [--generations 12] [--publish] [--stop]
+  npx tsx src/cli.ts dashboard [--generations 12] [--publish] [--no-pr] [--stop]
   npx tsx src/cli.ts dashboard-improve [--generations 12] [--web web/src] [--stop] [--publish]
   npx tsx src/cli.ts dashboard-publish [--ui-repo ranjan-rgb/Recursive-Agent-Dashboard]
   npx tsx src/cli.ts agent [--live] [--fast] [--per-minute 500] [--max 500]
@@ -589,6 +596,7 @@ Usage:
 Self-improving dashboard (gen 0 is broken; the agent repairs it):
   npm --prefix web install && npm --prefix web run dev
   npx tsx src/cli.ts agent --dashboard --generations 12 --publish
+  # Commits and PRs use ranjan-rgb <ranjan@allocations.com>. Pass --no-pr to skip PRs.
   npx tsx src/cli.ts dashboard-improve [--generations 12]
   # After the original 6 gen-0 defects it opens the next unpublished
   # high-quality catalog repair and keeps going. It no longer dies at 6.

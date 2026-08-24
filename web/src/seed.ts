@@ -5,7 +5,7 @@ export const ORIGIN_STATS: OriginLiveStats = {
   status: "stopped",
   forge: "origin",
   repo: "allocations/Alpha-throttle-test",
-  author: "Ranjan S <ranjan@allocations.com>",
+  author: "ranjan-rgb <ranjan@allocations.com>",
   targetMerged: 10000,
   tried: 10000,
   opened: 10000,

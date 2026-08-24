@@ -194,7 +194,7 @@ async function hashBlob(repoDir: string, body: string): Promise<string> {
   });
 }
 
-export const DEFAULT_COMMIT_NAME = "Ranjan S";
+export const DEFAULT_COMMIT_NAME = "ranjan-rgb";
 export const DEFAULT_COMMIT_EMAIL = "ranjan@allocations.com";
 
 export function resolveGitIdentity(

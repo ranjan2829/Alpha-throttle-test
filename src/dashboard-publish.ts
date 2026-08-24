@@ -2,7 +2,15 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import {
+  commitFilesAs,
+  githubToken,
+  parseRepoRef,
+} from "./dashboard-github.ts";
+import { gitCommitArgv, gitCommitEnv, tokenFromGitRemote, uiCommitIdentity } from "./dashboard-identity.ts";
 import { gitText, runProc } from "./throttle/git.ts";
+
+export { tokenFromGitRemote };
 
 export const DEFAULT_UI_REPO = "ranjan-rgb/Recursive-Agent-Dashboard";
 
@@ -37,11 +45,6 @@ export function uiRemoteUrl(repo = DEFAULT_UI_REPO, token?: string): string {
     return `https://x-access-token:${token}@github.com/${repo}.git`;
   }
   return `https://github.com/${repo}.git`;
-}
-
-export function tokenFromGitRemote(url: string): string | null {
-  const match = url.match(/x-access-token:([^@]+)@/i);
-  return match?.[1] ?? null;
 }
 
 export function standaloneViteConfig(): string {
@@ -103,7 +106,8 @@ UI-only repo. You are the cloud agent that keeps \`main\` current.
 3. Write a unique file \`src/patches/g{n}-{slug}-{entropy}.css\` and import it from \`src/patches.ts\`.
 4. Record the repair in \`src/memory.json\` (generation++, history, defect status, \`doNotRegress\`).
 5. Add a feed row under \`src/feed/\` when the UI lists generations.
-6. Commit as Ranjan S \`<ranjan@allocations.com>\` and **push \`main\`**.
+6. Commit as ranjan-rgb \`<ranjan@allocations.com>\` (author and committer) and **push \`main\`**.
+7. Open one unique-file PR per generation on this repo. Same identity on the PR commits.
 
 Do not stop after the original six gen-0 defects. Open the next quality backlog item and keep going.
 
@@ -113,6 +117,7 @@ Do not stop after the original six gen-0 defects. Open the next quality backlog 
 - Restore Comic Sans, magenta/yellow clash, or a rotated hero after gen 0.
 - Write "400 tickets" or "Claude does not write the tickets".
 - Squash-merge in a way that rewrites the author.
+- Commit as anyone except ranjan-rgb \`<ranjan@allocations.com>\`. Vercel Hobby blocks other authors on a private repo.
 
 ## Vercel
 
@@ -198,18 +203,17 @@ export async function publishDashboardToMain(
     const generation = options.generation ?? 0;
     const title = options.title ?? "full UI snapshot";
     const message = `Agent update gen ${generation}: ${title}`;
-    await runProc(
-      dest,
-      ["git", "-c", "user.name=Ranjan S", "-c", "user.email=ranjan@allocations.com", "commit", "-m", message],
-      {
-        ...process.env,
-        GIT_AUTHOR_NAME: "Ranjan S",
-        GIT_AUTHOR_EMAIL: "ranjan@allocations.com",
-        GIT_COMMITTER_NAME: "Ranjan S",
-        GIT_COMMITTER_EMAIL: "ranjan@allocations.com",
-      },
-    );
-    await runProc(dest, ["git", "push", "origin", "HEAD:main"]);
+    const identity = uiCommitIdentity();
+    await runProc(dest, gitCommitArgv(identity, message), gitCommitEnv(identity));
+    try {
+      await runProc(dest, ["git", "push", "origin", "HEAD:main"]);
+    } catch (pushErr) {
+      const sha = await publishViaGithubApi(dest, repo, message, identity, originUrl);
+      if (sha) {
+        return { repo, remoteUrl: uiRemoteUrl(repo), committed: true, sha, files };
+      }
+      throw pushErr;
+    }
     const sha = await gitText(dest, ["rev-parse", "HEAD"]);
     return { repo, remoteUrl: uiRemoteUrl(repo), committed: true, sha, files };
   } finally {
@@ -234,4 +238,25 @@ async function cloneOrInitUiRepo(work: string, remoteUrl: string): Promise<strin
     });
   }
   return dest;
+}
+
+async function publishViaGithubApi(
+  dest: string,
+  repo: string,
+  message: string,
+  identity: ReturnType<typeof uiCommitIdentity>,
+  originUrl: string,
+): Promise<string | null> {
+  const token = githubToken(process.env, originUrl);
+  if (!token) return null;
+  const files = listUiRepoFiles(dest).map((path) => ({
+    path,
+    content: readFileSync(join(dest, path), "utf8"),
+  }));
+  return commitFilesAs(token, parseRepoRef(repo), {
+    branch: "main",
+    message,
+    files,
+    identity,
+  });
 }

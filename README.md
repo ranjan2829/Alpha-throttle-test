@@ -19,7 +19,7 @@ Live Origin run · 23 Aug 2026 · **stopped** · target was 10 000
 
 Latest merged PR: [#11517](https://cursor.com/codebase/allocations/Alpha-throttle-test/pull/11517)
 
-Author: Ranjan S `<ranjan@allocations.com>`
+Author: ranjan-rgb `<ranjan@allocations.com>`
 
 ---
 
@@ -57,6 +57,7 @@ npm --prefix web install
 npm --prefix web run dev
 # http://127.0.0.1:5173  ← broken gen 0
 npx tsx src/cli.ts agent --dashboard --generations 12 --publish
+# unique-file PRs + main snapshot; author/committer/PR maker: ranjan-rgb
 npx tsx src/cli.ts dashboard-improve            # one repair
 npx tsx src/cli.ts dashboard-improve --generations 12
 ```
@@ -83,7 +84,9 @@ npx tsx src/cli.ts dashboard-improve --generations 12 --publish
 npx tsx src/cli.ts dashboard-publish
 ```
 
-Vercel: import **`ranjan-rgb/Recursive-Agent-Dashboard`** at [vercel.com/new](https://vercel.com/new).
+Vercel: import **`ranjan-rgb/Recursive-Agent-Dashboard`** at [vercel.com/new](https://vercel.com/new). Commits must be authored by **ranjan-rgb `<ranjan@allocations.com>`**. Hobby + a private repo blocks any other commit author.
+
+Every dashboard commit and PR uses that identity. Pass `--no-pr` only if you want a `main` snapshot without a unique-file PR.
 
 | setting | value |
 | --- | --- |
