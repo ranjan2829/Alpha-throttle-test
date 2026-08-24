@@ -1,0 +1,10 @@
+.tree, .feed-panel .feed, .feed-panel .memory {
+  scrollbar-width: thin;
+  scrollbar-color: #3a4558 transparent;
+}
+.tree::-webkit-scrollbar, .feed::-webkit-scrollbar, .memory::-webkit-scrollbar { height: 8px; width: 8px; }
+.tree::-webkit-scrollbar-thumb, .feed::-webkit-scrollbar-thumb, .memory::-webkit-scrollbar-thumb {
+  background: #3a4558; border-radius: 99px;
+}
+.feed-panel .feed, .feed-panel .memory { max-height: none; }
+.tree { overflow-x: auto; padding-bottom: 4px; }

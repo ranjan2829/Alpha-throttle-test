@@ -1,0 +1,15 @@
+{
+  "id": "g20-scroll-e02a570b",
+  "generation": 20,
+  "title": "Quiet scrollbars",
+  "summary": "Tree and memory panes get thin, dark scrollbars so overflow does not flash OS chrome.",
+  "acceptedAt": "2026-08-24T09:30:53.313Z",
+  "worker": "dashboard-ui",
+  "widget": {
+    "id": "widget-g20-scroll-e02a570b",
+    "kind": "copy",
+    "title": "Quiet scrollbars",
+    "body": "Keep overflow-x on the tree. Do not clip node labels.",
+    "tone": "mint"
+  }
+}

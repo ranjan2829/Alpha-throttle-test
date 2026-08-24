@@ -11,6 +11,7 @@ import "./patches/g17-buttons-6e121482.css";
 import "./patches/g18-elevation-88acad7a.css";
 import "./patches/g19-tabular-661030b3.css";
 import "./patches/g2-header-25e12243.css";
+import "./patches/g20-scroll-e02a570b.css";
 import "./patches/g3-layout-763bc932.css";
 import "./patches/g4-cards-37621d12.css";
 import "./patches/g5-tree-ee673744.css";

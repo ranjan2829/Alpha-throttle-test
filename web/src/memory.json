@@ -1,5 +1,5 @@
 {
-  "generation": 19,
+  "generation": 20,
   "qualityBar": "highest",
   "defects": [
     {
@@ -115,6 +115,12 @@
       "title": "Tabular numbers",
       "status": "fixed",
       "notes": "Generation chip, KPIs, and tree depth use IBM Plex Mono tabular figures so columns do not jitter."
+    },
+    {
+      "id": "scroll",
+      "title": "Quiet scrollbars",
+      "status": "fixed",
+      "notes": "Tree and memory panes get thin, dark scrollbars so overflow does not flash OS chrome."
     }
   ],
   "history": [
@@ -364,6 +370,19 @@
       "notes": "Mono is for numbers only. Body copy stays Instrument Sans.",
       "acceptedAt": "2026-08-24T09:16:53.789Z",
       "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 20,
+      "defectId": "scroll",
+      "title": "Quiet scrollbars",
+      "summary": "Tree and memory panes get thin, dark scrollbars so overflow does not flash OS chrome.",
+      "files": [
+        "patches/g20-scroll-e02a570b.css",
+        "memory.json"
+      ],
+      "notes": "Keep overflow-x on the tree. Do not clip node labels.",
+      "acceptedAt": "2026-08-24T09:30:53.313Z",
+      "worker": "dashboard-ui"
     }
   ],
   "doNotRegress": [
@@ -419,6 +438,8 @@
     "layered card elevation",
     "Layered elevation",
     "tabular mono numbers",
-    "Tabular numbers"
+    "Tabular numbers",
+    "thin dark scrollbars",
+    "Quiet scrollbars"
   ]
 }
