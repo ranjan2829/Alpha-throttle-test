@@ -16,6 +16,8 @@ export {
 } from "./dashboard-improve.ts";
 export { DASHBOARD_REPAIRS, unpublishedRepairs } from "./dashboard-repairs.ts";
 export { DEFAULT_UI_REPO, publishDashboardToMain, stageDashboardFiles } from "./dashboard-publish.ts";
+export { runDashboardAgent } from "./dashboard-agent.ts";
+export { verifyDashboardGeneration } from "./dashboard-verify.ts";
 export { resolveAgentTarget, policyForAgentTarget } from "./agent.ts";
 export { createGate, parseCreatedChange, isMergeRace } from "./throttle/adapter.ts";
 export { learn, plannedBurst, summarizeOutcomes } from "./throttle/policy.ts";

@@ -6,6 +6,7 @@ import { decomposeGoalMaybeClaude, policyForAgentTarget, resolveAgentTarget, wri
 import { floatFlag, intFlag, parseArgs, type CliArgs } from "./args.ts";
 import { loadDotEnv } from "./claude.ts";
 import { applyDashboardImprovement, defaultFeedDir, defaultWebSrc } from "./dashboard-improve.ts";
+import { runDashboardAgent } from "./dashboard-agent.ts";
 import { DEFAULT_UI_REPO, publishDashboardToMain } from "./dashboard-publish.ts";
 import { PlanValidationError } from "./errors.ts";
 import { parsePlannerRequest, resolvePlanner } from "./planner-select.ts";
@@ -39,6 +40,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return commandThrottle(args);
     case "agent":
       return commandAgent(args);
+    case "dashboard":
+      return commandDashboardAgent(args);
     case "origin-setup":
       return commandOriginSetup(args);
     case "origin-finish":
@@ -190,7 +193,41 @@ async function commandSmoke(args: CliArgs): Promise<number> {
 }
 
 async function commandAgent(args: CliArgs): Promise<number> {
+  if (args.switches.has("dashboard")) {
+    return commandDashboardAgent(args);
+  }
   return commandThrottle(args, { agent: true });
+}
+
+async function commandDashboardAgent(args: CliArgs): Promise<number> {
+  const planner = parsePlannerRequest(args.flags.get("planner"), args.switches);
+  const result = await runDashboardAgent({
+    repoRoot: process.cwd(),
+    webSrc: args.flags.get("web") ?? defaultWebSrc(process.cwd()),
+    feedDir: args.flags.get("feed") ?? defaultFeedDir(process.cwd()),
+    generations: intFlag(args, "generations", 12),
+    stop: args.switches.has("stop"),
+    publish: !args.switches.has("no-publish"),
+    uiRepo: args.flags.get("ui-repo") ?? DEFAULT_UI_REPO,
+    dryRun: args.switches.has("dry-run"),
+    worker: args.flags.get("worker") ?? "dashboard-agent",
+    planner: planner === "auto" ? "claude" : planner,
+  });
+  for (const step of result.steps) {
+    const publish =
+      step.publishError !== null
+        ? `publish-failed ${step.publishError}`
+        : step.published
+          ? `published ${step.publishRepo} ${step.publishSha ?? ""}`
+          : "local";
+    process.stdout.write(
+      `gen ${step.generation} verified → ${step.title} (${step.patchPath}) ${publish}\n`,
+    );
+  }
+  process.stdout.write(
+    `agent ${result.repo} memory gen ${result.memoryGen} · ${result.steps.length} repairs\n`,
+  );
+  return 0;
 }
 
 async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent: false }): Promise<number> {
@@ -529,6 +566,9 @@ Usage:
   npx tsx src/cli.ts plan --goal "<goal>" --workspace .alpha/my-goal
   npx tsx src/cli.ts tree --workspace .alpha/my-goal
   npx tsx src/cli.ts smoke
+  npx tsx src/cli.ts agent --dashboard [--generations 12] [--publish] [--stop]
+      [--ui-repo ranjan-rgb/Recursive-Agent-Dashboard]
+  npx tsx src/cli.ts dashboard [--generations 12] [--publish] [--stop]
   npx tsx src/cli.ts dashboard-improve [--generations 12] [--web web/src] [--stop] [--publish]
   npx tsx src/cli.ts dashboard-publish [--ui-repo ranjan-rgb/Recursive-Agent-Dashboard]
   npx tsx src/cli.ts agent [--live] [--fast] [--per-minute 500] [--max 500]
@@ -548,6 +588,7 @@ Usage:
 
 Self-improving dashboard (gen 0 is broken; the agent repairs it):
   npm --prefix web install && npm --prefix web run dev
+  npx tsx src/cli.ts agent --dashboard --generations 12 --publish
   npx tsx src/cli.ts dashboard-improve [--generations 12]
   # After the original 6 gen-0 defects it opens the next unpublished
   # high-quality catalog repair and keeps going. It no longer dies at 6.

@@ -56,6 +56,7 @@ Gen 0 is a **broken** UI on purpose. The agent reads `web/src/memory.json`, appl
 npm --prefix web install
 npm --prefix web run dev
 # http://127.0.0.1:5173  ← broken gen 0
+npx tsx src/cli.ts agent --dashboard --generations 12 --publish
 npx tsx src/cli.ts dashboard-improve            # one repair
 npx tsx src/cli.ts dashboard-improve --generations 12
 ```
