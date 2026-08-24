@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { decomposeGoalMaybeClaude, policyForAgentTarget, resolveAgentTarget, writeAgentTree } from "./agent.ts";
 import { floatFlag, intFlag, parseArgs, type CliArgs } from "./args.ts";
 import { loadDotEnv } from "./claude.ts";
-import { applyDashboardImprovement, defaultFeedDir, defaultWebSrc } from "./dashboard-improve.ts";
+import { applyDashboardImprovement, defaultWebSrc } from "./dashboard-improve.ts";
 import { PlanValidationError } from "./errors.ts";
 import { parsePlannerRequest, resolvePlanner } from "./planner-select.ts";
 import { renderTree, runOrchestrator } from "./orchestrator.ts";
@@ -459,7 +459,7 @@ function plannerFromArgs(args: CliArgs) {
 
 function commandDashboardImprove(args: CliArgs): number {
   const webSrc = args.flags.get("web") ?? defaultWebSrc(process.cwd());
-  const feedDir = args.flags.get("feed") ?? defaultFeedDir(process.cwd());
+  const feedDir = args.flags.get("feed");
   const worker = args.flags.get("worker") ?? "cli-dashboard-improve";
   const generations = intFlag(args, "generations", 1);
   const planner = parsePlannerRequest(args.flags.get("planner"), args.switches);
@@ -471,16 +471,16 @@ function commandDashboardImprove(args: CliArgs): number {
     try {
       const result = applyDashboardImprovement({
         webSrc,
-        feedDir,
+        ...(feedDir ? { feedDir } : {}),
         worker,
         planner: planner === "auto" ? "claude" : planner,
         stop,
         ...(entropy ? { entropy } : {}),
       });
       lastTitle = result.item.title;
-      lastGeneration = result.generation.generation;
+      lastGeneration = result.item.generation;
       process.stdout.write(
-        `accepted generation ${result.generation.generation} → ${result.item.title} (${result.patchPath})\n`,
+        `accepted generation ${result.item.generation} → ${result.item.title} (${result.patchPath})\n`,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "dashboard-improve failed";
