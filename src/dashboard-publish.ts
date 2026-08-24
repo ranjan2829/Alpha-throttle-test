@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { gitText, runProc } from "./throttle/git.ts";
 
 export const DEFAULT_UI_REPO = "ranjan-rgb/Recursive-Agent-Dashboard";
-export const LEGACY_UI_REPO = "ranjan2829/alpha-throttle-dashboard";
 
 export interface PublishDashboardOptions {
   repoRoot: string;
