@@ -3,6 +3,8 @@ import { dirname, join } from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 
 import { applyDashboardImprovement, defaultWebSrc } from "../src/dashboard-improve.ts";
+import { detectForgeLogin, openDashboardHealPr, resolveHealAdapter } from "../src/dashboard-pr.ts";
+import { DEFAULT_ORIGIN_REPO, parseRepoSlug } from "../src/throttle/forge.ts";
 
 const webRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(webRoot, "..");
@@ -24,17 +26,34 @@ function improveApi(): Plugin {
       server.middlewares.use((req, res, next) => {
         const url = req.url ?? "";
         if (url === "/api/improve" && req.method === "POST") {
-          try {
-            const result = applyDashboardImprovement({
-              webSrc: defaultWebSrc(repoRoot),
-              worker: "dashboard-ui",
-              planner: "claude",
-            });
-            sendJson(res, 200, { ok: true, result });
-          } catch (err) {
-            const message = err instanceof Error ? err.message : "improve failed";
-            sendJson(res, 500, { ok: false, error: message });
-          }
+          void (async () => {
+            try {
+              const result = applyDashboardImprovement({
+                webSrc: defaultWebSrc(repoRoot),
+                worker: "dashboard-ui",
+                planner: "claude",
+              });
+              const forged = detectForgeLogin();
+              const { adapter, merge } = resolveHealAdapter({
+                pr: true,
+                forged,
+                repoDir: repoRoot,
+                forgeRepo: parseRepoSlug(DEFAULT_ORIGIN_REPO, "origin"),
+                baseBranch: "main",
+              });
+              const pr = adapter ? await openDashboardHealPr(result, adapter, { merge }) : null;
+              sendJson(res, 200, {
+                ok: true,
+                result,
+                pr: pr
+                  ? { status: pr.status, prNumber: pr.prNumber, prUrl: pr.prUrl }
+                  : null,
+              });
+            } catch (err) {
+              const message = err instanceof Error ? err.message : "improve failed";
+              sendJson(res, 500, { ok: false, error: message });
+            }
+          })();
           return;
         }
         next();

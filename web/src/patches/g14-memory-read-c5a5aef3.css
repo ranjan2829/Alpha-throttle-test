@@ -1,0 +1,11 @@
+.feed-panel .memory { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.feed-meta {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  margin-bottom: 6px; color: var(--muted); font-size: 12px;
+}
+.memory-item h3, .feed-item h3 { margin: 0 0 4px; }
+.memory-item p, .feed-item p { margin: 0; }
+.memory-item.fixed .pill { color: #8fd9c4; }
+.memory-item.open .pill { color: var(--amber); }
+.feed-item .worker, .memory-item .worker { margin-top: 8px; color: var(--muted); font-family: "IBM Plex Mono", monospace; }
+.feed-item time { font-variant-numeric: tabular-nums; }

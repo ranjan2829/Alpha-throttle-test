@@ -1,0 +1,15 @@
+{
+  "id": "g7-type-scale-a88be2c4",
+  "generation": 7,
+  "title": "Modular type scale",
+  "summary": "Locked a 12/14/16/22/28/38 scale so titles, kicker, and body stay in one family.",
+  "acceptedAt": "2026-08-24T09:14:30.086Z",
+  "worker": "dashboard-ui",
+  "widget": {
+    "id": "widget-g7-type-scale-a88be2c4",
+    "kind": "copy",
+    "title": "Modular type scale",
+    "body": "Keep Instrument Sans. Never restore Comic Sans or Papyrus after gen 0.",
+    "tone": "mint"
+  }
+}

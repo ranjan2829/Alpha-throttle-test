@@ -1,0 +1,22 @@
+.kpis .kpi,
+.speed-card {
+  float: none;
+  width: auto;
+  min-height: 0;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+.kpis .kpi:nth-child(3) {
+  background: linear-gradient(180deg, #16382f, var(--card));
+  border-color: #2a5a4c;
+}
+.kpis .kpi:nth-child(3) .kpi-val { color: var(--mint); font-size: 28px; }
+.kpi-val, .speed-num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+.speed-num span { font-size: 0.55em; color: var(--muted); font-weight: 500; margin-left: 2px; }
+.speed-card.accent .speed-num { color: var(--mint); }
+.kpi .eyebrow, .speed-card .eyebrow { margin-bottom: 8px; }

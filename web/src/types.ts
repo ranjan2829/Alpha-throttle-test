@@ -62,6 +62,11 @@ export interface ImproveApiResponse {
     item?: ImprovementItem;
     generation?: { generation: number; version: string };
   };
+  pr?: {
+    status: string;
+    prNumber: number | null;
+    prUrl: string | null;
+  } | null;
 }
 
 export type DefectStatus = "open" | "fixed";

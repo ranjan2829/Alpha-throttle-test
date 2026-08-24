@@ -1,0 +1,15 @@
+{
+  "id": "g19-tabular-661030b3",
+  "generation": 19,
+  "title": "Tabular numbers",
+  "summary": "Generation chip, KPIs, and tree depth use IBM Plex Mono tabular figures so columns do not jitter.",
+  "acceptedAt": "2026-08-24T09:16:53.789Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g19-tabular-661030b3",
+    "kind": "copy",
+    "title": "Tabular numbers",
+    "body": "Mono is for numbers only. Body copy stays Instrument Sans.",
+    "tone": "mint"
+  }
+}

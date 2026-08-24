@@ -1,0 +1,17 @@
+.primary, .ghost { min-height: 44px; min-width: 44px; }
+.shell { scroll-margin-top: 16px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+.node-card .role { font-weight: 650; }
+.broken-banner, .notice { font-weight: 550; }
+@media (forced-colors: active) {
+  .primary, .ghost, .kpi, .pipe, .widget, .panel, .node-card {
+    border: 1px solid ButtonText;
+    box-shadow: none;
+  }
+}

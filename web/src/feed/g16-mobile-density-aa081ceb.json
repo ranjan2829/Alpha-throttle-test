@@ -1,0 +1,15 @@
+{
+  "id": "g16-mobile-density-aa081ceb",
+  "generation": 16,
+  "title": "Mobile density",
+  "summary": "Tightened phone layout: smaller type, stacked actions, and cards that do not waste vertical space.",
+  "acceptedAt": "2026-08-24T09:16:53.787Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g16-mobile-density-aa081ceb",
+    "kind": "copy",
+    "title": "Mobile density",
+    "body": "Phone is a first-class surface. Keep one column under 640px.",
+    "tone": "mint"
+  }
+}

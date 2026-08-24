@@ -1,0 +1,15 @@
+{
+  "id": "g9-focus-0f4df5d4",
+  "generation": 9,
+  "title": "Visible focus states",
+  "summary": "Gave buttons, memory rows, and the Improve action a mint focus ring that survives dark UI.",
+  "acceptedAt": "2026-08-24T09:16:53.783Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g9-focus-0f4df5d4",
+    "kind": "copy",
+    "title": "Visible focus states",
+    "body": "Keyboard users must see where they are. Do not remove outlines.",
+    "tone": "mint"
+  }
+}

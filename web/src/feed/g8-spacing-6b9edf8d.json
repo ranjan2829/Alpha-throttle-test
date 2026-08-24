@@ -1,0 +1,15 @@
+{
+  "id": "g8-spacing-6b9edf8d",
+  "generation": 8,
+  "title": "Spacing rhythm",
+  "summary": "Replaced ad-hoc gaps with a 4px rhythm so cards, panels, and the shell share one beat.",
+  "acceptedAt": "2026-08-24T09:16:53.782Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g8-spacing-6b9edf8d",
+    "kind": "copy",
+    "title": "Spacing rhythm",
+    "body": "4 / 8 / 12 / 16 / 24 / 32. Do not invent random pixel gaps.",
+    "tone": "mint"
+  }
+}
