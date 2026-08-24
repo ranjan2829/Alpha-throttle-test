@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { planBurstSplit, type ClaudeClient } from "../claude.ts";
+import { planBurstSplit, type BurstPlanner, type ClaudeClient } from "../claude.ts";
 import type { Handoff, Plan, PlanTask } from "../types.ts";
 import { DEFAULT_BOUNDS } from "../types.ts";
 import type { PrAdapter } from "./adapter.ts";
@@ -39,6 +39,7 @@ export interface ThrottleRunOptions {
   maxDepth: number;
   live: boolean;
   claude?: ClaudeClient | null;
+  plannerName?: BurstPlanner;
   /** Stop once this many tickets merge (dry-run counts as merged). */
   untilMerged?: number | null;
   /** Episode size when untilMerged is set. */
@@ -107,6 +108,7 @@ export async function runThrottleLoop(options: ThrottleRunOptions): Promise<Thro
       paths,
       claude: options.claude ?? null,
       compact,
+      ...(options.plannerName ? { plannerName: options.plannerName } : {}),
     });
     const stats = summarizeOutcomes(outcomes);
     const next = learn(policy, stats, clock.now());
@@ -197,12 +199,14 @@ async function runBurst(args: {
   paths: ThrottlePaths;
   claude: ClaudeClient | null;
   compact: boolean;
+  plannerName?: BurstPlanner;
 }): Promise<TicketOutcome[]> {
   const split = await planBurstSplit({
     claude: args.claude,
     ticketCount: args.tickets.length,
     depth: args.depth,
     maxDepth: args.maxDepth,
+    ...(args.plannerName ? { plannerName: args.plannerName } : {}),
   });
   appendPlannerSplit(args.paths.root, {
     kind: split.kind,

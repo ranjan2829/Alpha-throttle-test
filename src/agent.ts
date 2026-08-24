@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { ClaudeClient } from "./claude.ts";
+import type { BurstPlanner, ClaudeClient } from "./claude.ts";
 import { parseClaudeGoalSlices } from "./claude.ts";
 import { decomposeGoal, type PlanOptions } from "./planner.ts";
 import { SAFE_POLICY, type RatePolicy } from "./throttle/types.ts";
@@ -87,7 +87,7 @@ export async function decomposeGoalMaybeClaude(
 export function writeAgentTree(
   workspace: string,
   tree: {
-    planner: "claude" | "deterministic";
+    planner: BurstPlanner;
     depth: number;
     maxDepth: number;
     tickets: number;

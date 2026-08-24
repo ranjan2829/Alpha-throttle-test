@@ -15,7 +15,10 @@
     "smoke": "tsx src/cli.ts smoke",
     "throttle": "tsx src/cli.ts throttle",
     "test": "tsx --test test/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dashboard": "npm --prefix web run dev",
+    "dashboard:build": "npm --prefix web run build",
+    "dashboard:improve": "tsx src/cli.ts dashboard-improve"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

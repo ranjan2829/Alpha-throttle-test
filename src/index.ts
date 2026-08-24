@@ -5,6 +5,9 @@ export { parsePlan, parseHandoff, validateTaskGraph, slugify } from "./validate.
 export { DEFAULT_BOUNDS } from "./types.ts";
 export { runThrottleLoop, sliceTickets } from "./throttle/loop.ts";
 export { readClaudeApiKey, deterministicBurstSplit, parseBurstSplit } from "./claude.ts";
+export { readGrokApiKey, createGrokClient, DEFAULT_GROK_MODEL } from "./grok.ts";
+export { resolvePlanner, parsePlannerRequest } from "./planner-select.ts";
+export { applyDashboardImprovement, loadImprovements, IMPROVE_CATALOG } from "./dashboard-improve.ts";
 export { resolveAgentTarget, policyForAgentTarget } from "./agent.ts";
 export { createGate, parseCreatedChange, isMergeRace } from "./throttle/adapter.ts";
 export { learn, plannedBurst, summarizeOutcomes } from "./throttle/policy.ts";

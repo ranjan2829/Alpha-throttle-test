@@ -45,3 +45,23 @@ flowchart TD
 ```
 
 At `maxDepth` Claude stops. Leaves are deterministic: one file, one Origin PR, merge-commit.
+
+---
+
+## Self-improving dashboard
+
+Demo console for the recursive agent. Seeded with the Origin 10k stats above so it looks live offline. Each accepted worker handoff writes a **unique** widget file under `web/src/feed/` and bumps the generation badge.
+
+```bash
+npm --prefix web install
+npm --prefix web run dev
+# http://127.0.0.1:5173
+npx tsx src/cli.ts dashboard-improve
+```
+
+Planner flag (does not block the demo if no Grok key):
+
+```bash
+npx tsx src/cli.ts agent --planner grok
+# needs XAI_API_KEY or GROK_API_KEY; otherwise falls back to Claude, then deterministic
+```

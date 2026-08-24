@@ -4,8 +4,10 @@ import { join } from "node:path";
 
 import { decomposeGoalMaybeClaude, policyForAgentTarget, resolveAgentTarget, writeAgentTree } from "./agent.ts";
 import { floatFlag, intFlag, parseArgs, type CliArgs } from "./args.ts";
-import { createClaudeClient, loadDotEnv, readClaudeApiKey } from "./claude.ts";
+import { loadDotEnv } from "./claude.ts";
+import { applyDashboardImprovement, defaultFeedDir } from "./dashboard-improve.ts";
 import { PlanValidationError } from "./errors.ts";
+import { parsePlannerRequest, resolvePlanner } from "./planner-select.ts";
 import { renderTree, runOrchestrator } from "./orchestrator.ts";
 import { decomposeGoal } from "./planner.ts";
 import { ensureWorkspace, loadPlan, loadState, savePlan, workspacePaths } from "./store.ts";
@@ -40,6 +42,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return commandOriginSetup(args);
     case "origin-finish":
       return commandOriginFinish(args);
+    case "dashboard-improve":
+      return commandDashboardImprove(args);
     case "help":
     case "--help":
     case "-h":
@@ -65,13 +69,13 @@ async function commandRun(args: CliArgs): Promise<number> {
     throw new PlanValidationError("--adapter must be local | files");
   }
   const depth = intFlag(args, "depth", 0);
-  const claude = claudeFromArgs(args);
+  const planner = plannerFromArgs(args);
   const plan = await decomposeGoalMaybeClaude({
     goal,
     bounds,
     depth,
     parentName: null,
-    claude,
+    claude: planner.client,
   });
   const result = await runOrchestrator({
     goal,
@@ -285,23 +289,39 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
         latencyMs: intFlag(args, "latency-ms", 0),
       });
 
-  const claude = fast ? null : claudeFromArgs(args);
-  if (mode.agent && live && !fast && !claude) {
-    process.stderr.write("live agent requires ANTHROPIC_API_KEY (or pass --fast)\n");
+  const resolved = fast
+    ? {
+        kind: "deterministic" as const,
+        client: null,
+        requested: "deterministic" as const,
+        fallback: false,
+        reason: "--fast: deterministic split, no model.",
+      }
+    : plannerFromArgs(args);
+  if (mode.agent && live && !fast && !resolved.client) {
+    process.stderr.write(
+      "live agent requires ANTHROPIC_API_KEY or XAI_API_KEY (or pass --fast / --planner deterministic)\n",
+    );
     return 2;
   }
-  const planner = claude ? "claude" : "deterministic";
+  const planner = resolved.kind;
+  if (resolved.fallback) {
+    process.stderr.write(`${resolved.reason}\n`);
+  }
   if (mode.agent) {
     writeAgentTree(workspace, {
       planner,
       depth: 0,
       maxDepth: intFlag(args, "max-depth", 3),
       tickets: target.maxPrs,
-      note: claude
-        ? "Claude splits each burst; leaf workers open unique Origin PRs and merge."
-        : fast
-          ? "--fast: deterministic split, no Claude."
-          : "No ANTHROPIC_API_KEY yet. Same recursive split, deterministic planner. Paste the key and rerun.",
+      note:
+        planner === "claude"
+          ? "Claude splits each burst; leaf workers open unique Origin PRs and merge."
+          : planner === "grok"
+            ? "Grok 4.6 splits each burst; leaf workers open unique Origin PRs and merge."
+            : fast
+              ? "--fast: deterministic split, no model."
+              : resolved.reason,
     });
   }
 
@@ -325,7 +345,8 @@ async function commandThrottle(args: CliArgs, mode: { agent: boolean } = { agent
     maxEpisodes,
     maxDepth: intFlag(args, "max-depth", 3),
     live,
-    claude,
+    claude: resolved.client,
+    plannerName: planner,
     ...(untilMerged !== null && untilMerged > 0 ? { untilMerged } : {}),
     ...(chunk > 0 ? { chunk } : {}),
     ...(sweep ? { sweep } : {}),
@@ -419,13 +440,39 @@ function requiredFlag(args: CliArgs, name: string): string | undefined {
   return args.flags.get(name);
 }
 
-function claudeFromArgs(args: CliArgs) {
-  const key = args.flags.get("api-key") ?? readClaudeApiKey();
-  if (args.switches.has("claude") && !key) {
+function plannerFromArgs(args: CliArgs) {
+  const requested = parsePlannerRequest(args.flags.get("planner"), args.switches);
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  const flagKey = args.flags.get("api-key");
+  if (flagKey && requested !== "grok") {
+    env.ANTHROPIC_API_KEY = flagKey;
+  }
+  if (flagKey && requested === "grok") {
+    env.XAI_API_KEY = flagKey;
+  }
+  const resolved = resolvePlanner({ requested, env });
+  if ((args.switches.has("claude") || requested === "claude") && !resolved.client && requested !== "auto") {
     throw new PlanValidationError("set ANTHROPIC_API_KEY or pass --api-key");
   }
-  if (!key) return null;
-  return createClaudeClient(key);
+  return resolved;
+}
+
+function commandDashboardImprove(args: CliArgs): number {
+  const feedDir = args.flags.get("feed") ?? defaultFeedDir(process.cwd());
+  const worker = args.flags.get("worker") ?? "cli-dashboard-improve";
+  const entropy = args.flags.get("id") ?? undefined;
+  const planner = parsePlannerRequest(args.flags.get("planner"), args.switches);
+  const result = applyDashboardImprovement({
+    feedDir,
+    worker,
+    planner: planner === "auto" ? "claude" : planner,
+    ...(entropy ? { entropy } : {}),
+  });
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  process.stdout.write(
+    `accepted generation ${result.generation.generation} → ${result.item.title} (${result.path})\n`,
+  );
+  return 0;
 }
 
 function printHelp(): void {
@@ -434,13 +481,15 @@ function printHelp(): void {
 Usage:
   npx tsx src/cli.ts run --goal "<goal>" [--workspace .alpha/my-goal]
       [--max-depth 3] [--max-concurrency 3] [--max-respawns 2]
-      [--adapter local|files] [--claude]
+      [--adapter local|files] [--planner auto|claude|grok|deterministic]
   npx tsx src/cli.ts plan --goal "<goal>" --workspace .alpha/my-goal
   npx tsx src/cli.ts tree --workspace .alpha/my-goal
   npx tsx src/cli.ts smoke
+  npx tsx src/cli.ts dashboard-improve [--feed web/src/feed] [--id unique-token]
   npx tsx src/cli.ts agent [--live] [--fast] [--per-minute 500] [--max 500]
       [--until-merged 100000] [--chunk 400]
       [--concurrency 32] [--forge origin]
+      [--planner auto|claude|grok|deterministic]
       [--repo allocations/Alpha-throttle-test]
   npx tsx src/cli.ts throttle [--workspace .alpha/throttle]
       [--rate 2] [--max 8] [--concurrency 2] [--episodes 3]
@@ -452,13 +501,21 @@ Usage:
   npx tsx src/cli.ts throttle --live --max 3 --rate 1 --forge origin
       [--repo allocations/Alpha-throttle-test] [--no-merge]
 
+Self-improving dashboard:
+  npm --prefix web install && npm --prefix web run dev
+  npx tsx src/cli.ts dashboard-improve
+
 Recursive agent (Origin throttle test):
   export ANTHROPIC_API_KEY=sk-...
   npx tsx src/cli.ts agent --live --until-merged ${EXTREME_UNTIL_MERGED} --chunk 400 \\
       --concurrency 32 --forge origin --repo allocations/Alpha-throttle-test
+  # Grok 4.6 planner (falls back if XAI_API_KEY is unset):
+  npx tsx src/cli.ts agent --planner grok --fast
 
-Claude is the planner when ANTHROPIC_API_KEY is set. Live agent requires
-the key unless you pass --fast (deterministic split only). Each split is
+Claude is the planner when ANTHROPIC_API_KEY is set. Pass --planner grok
+to try Grok 4.6 (XAI_API_KEY or GROK_API_KEY). Missing keys fall back to
+Claude, then deterministic — the dashboard demo does not need a Grok key.
+Live agent requires a planner key unless you pass --fast. Each split is
 appended to claude-splits.jsonl. Leaves open one unique-file PR then
 merge-commit (not squash). 500/sec is not possible over Origin HTTP.
 --until-merged ${EXTREME_UNTIL_MERGED} keeps chunking until that many PRs merge.

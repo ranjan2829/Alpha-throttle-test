@@ -24,7 +24,7 @@ export interface ClaudeCompleteOptions {
   fetchImpl?: typeof fetch;
 }
 
-export type BurstPlanner = "claude" | "deterministic";
+export type BurstPlanner = "claude" | "grok" | "deterministic";
 
 export interface BurstSplit {
   kind: "leaf" | "parts";
@@ -192,8 +192,10 @@ export async function planBurstSplit(options: {
   ticketCount: number;
   depth: number;
   maxDepth: number;
+  plannerName?: BurstPlanner;
 }): Promise<BurstSplit> {
   const fallback = deterministicBurstSplit(options.ticketCount, options.depth, options.maxDepth);
+  const plannerName = options.plannerName ?? (options.claude ? "claude" : "deterministic");
   if (!options.claude || fallback.kind === "leaf") {
     return fallback;
   }
@@ -208,7 +210,8 @@ export async function planBurstSplit(options: {
         'If you should not split, return {"kind":"leaf"}.',
       ].join("\n"),
     );
-    return { ...parseBurstSplit(text, options.ticketCount), planner: "claude" };
+    const tagged: BurstPlanner = plannerName === "deterministic" ? "claude" : plannerName;
+    return { ...parseBurstSplit(text, options.ticketCount), planner: tagged };
   } catch {
     return fallback;
   }
