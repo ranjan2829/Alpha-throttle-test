@@ -20,4 +20,4 @@ Saturation command the user may raise later — do not invent these flags:
 npx tsx src/cli.ts throttle --live --rate 1000 --max 50 --concurrency 10
 ```
 
-After each episode, read `.alpha/throttle/rates.json` and `handoffs/`. Backoff is already applied on 429s. Speed up only after a clean burst. Workers open isolated ticket branches. Verifiers observe accept/reject/merge/throttle. You update policy from those handoffs, not from chat memory.
+After each episode, read `.alpha/throttle/rates.json` and `handoffs/`. Backoff is already applied on 429s. Speed up only after a clean burst. Workers open isolated ticket branches. On merge conflict or Origin main-ref race the worker fetches base, auto-resolves, records `.alpha/conflict-memory.json`, and retries. Verifiers observe accept/reject/merge/throttle. You update policy from those handoffs, not from chat memory.

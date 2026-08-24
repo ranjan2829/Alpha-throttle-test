@@ -4,6 +4,16 @@ export { decomposeGoal, splitGoal, verifierFor } from "./planner.ts";
 export { parsePlan, parseHandoff, validateTaskGraph, slugify } from "./validate.ts";
 export { DEFAULT_BOUNDS } from "./types.ts";
 export { runThrottleLoop } from "./throttle/loop.ts";
+export {
+  isConflictOrRace,
+  isMergeRace,
+  mergeWithConflictRetry,
+} from "./throttle/adapter.ts";
+export {
+  classifyConflictPath,
+  rememberConflict,
+  resolveWorkspaceConflicts,
+} from "./throttle/conflicts.ts";
 export { learn, plannedBurst, summarizeOutcomes } from "./throttle/policy.ts";
 export { SAFE_POLICY, LIVE_DEFAULT_MAX } from "./throttle/types.ts";
 export {

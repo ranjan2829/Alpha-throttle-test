@@ -23,3 +23,5 @@ When finished, write `handoff.json` in this directory:
 ```
 
 Do not read sibling `nodes/` directories. Do not wait for other workers.
+
+If git merge/rebase or an Origin main-ref race conflicts, resolve it yourself (`npx tsx src/cli.ts resolve-conflicts`). Keep owned unique ticket/dashboard files, take unrelated files from main, union README (never restore "400 tickets").

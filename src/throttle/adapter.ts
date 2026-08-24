@@ -1,9 +1,16 @@
 import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import {
+  isConflictOrRace,
+  resolveWorkspaceConflicts,
+} from "./conflicts.ts";
 import { compareUrlFor, type ForgeRepo } from "./forge.ts";
+import { runProc } from "./git.ts";
 import type { Clock, TicketOutcome, TicketSpec, ThrottleAdapterKind } from "./types.ts";
+
+export { isConflictOrRace, isGitConflict, isMergeRace } from "./conflicts.ts";
 
 export interface PrAdapter {
   readonly kind: ThrottleAdapterKind;
@@ -68,6 +75,33 @@ export interface LiveAdapterOptions {
   repoDir: string;
   forgeRepo: ForgeRepo;
   baseBranch: string;
+  /** Merge after open. Conflicts and Origin races resolve then retry. */
+  merge?: boolean;
+}
+
+export interface ConflictRetryHooks {
+  merge(): Promise<void>;
+  resolve(message: string): Promise<void>;
+}
+
+export async function mergeWithConflictRetry(
+  hooks: ConflictRetryHooks,
+  maxAttempts = 8,
+): Promise<void> {
+  let lastError = "merge failed";
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await hooks.merge();
+      return;
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : "merge failed";
+      if (!isConflictOrRace(lastError) || attempt === maxAttempts) {
+        throw err;
+      }
+      await hooks.resolve(lastError);
+    }
+  }
+  throw new Error(lastError);
 }
 
 export function compareUrl(owner: string, repo: string, base: string, head: string): string {
@@ -88,11 +122,13 @@ export function classifyLiveFailure(message: string, pushed: boolean): {
 }
 
 export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
+  const owned = new Map<string, string>();
   return {
     kind: "live",
     async openTicket(ticket: TicketSpec): Promise<TicketOutcome> {
       const started = options.clock.nowMs();
       let pushed = false;
+      owned.set(ticket.ticketId, ticket.path);
       try {
         const work = join(options.repoDir, ".alpha", "worktrees", ticket.ticketId);
         mkdirSync(join(options.repoDir, ".alpha", "worktrees"), { recursive: true });
@@ -111,7 +147,20 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
         writeFileSync(join(work, ticket.path), ticket.body, "utf8");
         await run(work, ["git", "add", ticket.path]);
         await run(work, ["git", "commit", "-m", ticket.title]);
-        await run(work, ["git", "push", "-u", options.forgeRepo.remote, ticket.branch]);
+        await mergeWithConflictRetry({
+          merge: async () => {
+            await run(work, ["git", "push", "-u", options.forgeRepo.remote, ticket.branch]);
+          },
+          resolve: async (message) => {
+            await resolveWorkspaceConflicts({
+              repoDir: work,
+              remote: options.forgeRepo.remote,
+              baseBranch: options.baseBranch,
+              ownedPaths: [ticket.path],
+              message,
+            });
+          },
+        });
         pushed = true;
         const created = await createChange(work, options.forgeRepo, options.baseBranch, ticket);
         const urlMatch = created.stdout.match(/https:\/\/(?:origin\.cursor\.com|github\.com)\/\S+/);
@@ -130,6 +179,21 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : "live open failed";
+        if (isConflictOrRace(message)) {
+          try {
+            const work = join(options.repoDir, ".alpha", "worktrees", ticket.ticketId);
+            const repoDir = existsSync(work) ? work : options.repoDir;
+            await resolveWorkspaceConflicts({
+              repoDir,
+              remote: options.forgeRepo.remote,
+              baseBranch: options.baseBranch,
+              ownedPaths: [ticket.path],
+              message,
+            });
+          } catch {
+            // keep the original open error
+          }
+        }
         const classified = classifyLiveFailure(message, pushed);
         return {
           ticketId: ticket.ticketId,
@@ -153,6 +217,42 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
     async observe(outcome: TicketOutcome): Promise<TicketOutcome> {
       if (!outcome.prNumber && !outcome.branch) return outcome;
       try {
+        if (options.merge === true && outcome.status === "opened") {
+          const mergeStarted = options.clock.nowMs();
+          const work = join(options.repoDir, ".alpha", "worktrees", outcome.ticketId);
+          const workDir = existsSync(work) ? work : options.repoDir;
+          const ownedPath = owned.get(outcome.ticketId);
+          await mergeWithConflictRetry({
+            merge: async () => {
+              await mergeChange(options.repoDir, options.forgeRepo, outcome);
+            },
+            resolve: async (message) => {
+              await resolveWorkspaceConflicts({
+                repoDir: workDir,
+                remote: options.forgeRepo.remote,
+                baseBranch: options.baseBranch,
+                ...(ownedPath ? { ownedPaths: [ownedPath] } : {}),
+                message,
+              });
+              try {
+                await runProc(workDir, [
+                  "git",
+                  "push",
+                  "--force-with-lease",
+                  options.forgeRepo.remote,
+                  `HEAD:refs/heads/${outcome.branch}`,
+                ]);
+              } catch {
+                // restack push is best-effort; merge retry still runs
+              }
+            },
+          });
+          return {
+            ...outcome,
+            status: "merged",
+            mergeMs: options.clock.nowMs() - mergeStarted,
+          };
+        }
         const viewed = await observeChange(options.repoDir, options.forgeRepo, outcome);
         if (viewed.state === "MERGED" || viewed.state === "merged") {
           return { ...outcome, status: "merged", prUrl: viewed.url ?? outcome.prUrl };
@@ -163,10 +263,38 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
         return { ...outcome, status: "opened", prUrl: viewed.url ?? outcome.prUrl };
       } catch (err) {
         const message = err instanceof Error ? err.message : "observe failed";
+        if (isConflictOrRace(message)) {
+          const work = join(options.repoDir, ".alpha", "worktrees", outcome.ticketId);
+          const workDir = existsSync(work) ? work : options.repoDir;
+          const ownedPath = owned.get(outcome.ticketId);
+          try {
+            await resolveWorkspaceConflicts({
+              repoDir: workDir,
+              remote: options.forgeRepo.remote,
+              baseBranch: options.baseBranch,
+              ...(ownedPath ? { ownedPaths: [ownedPath] } : {}),
+              message,
+            });
+          } catch {
+            // surface the observe error
+          }
+        }
         return { ...outcome, error: message };
       }
     },
   };
+}
+
+async function mergeChange(repoDir: string, forgeRepo: ForgeRepo, outcome: TicketOutcome): Promise<void> {
+  const target = outcome.prNumber ? String(outcome.prNumber) : outcome.branch;
+  if (forgeRepo.forge === "origin") {
+    await run(repoDir, ["origin", "pr", "merge", target, "-R", forgeRepo.slug, "--merge"]);
+    return;
+  }
+  if (!outcome.prNumber) {
+    throw new Error("cannot merge GitHub PR without a number");
+  }
+  await run(repoDir, ["gh", "pr", "merge", String(outcome.prNumber), "--merge"]);
 }
 
 async function ensureRemote(repoDir: string, forgeRepo: ForgeRepo): Promise<void> {
