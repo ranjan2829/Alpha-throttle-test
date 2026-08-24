@@ -1,8 +1,14 @@
 import { spawn } from "node:child_process";
 
+import {
+  isConflictOrRace,
+  resolveWorkspaceConflicts,
+} from "./conflicts.ts";
 import { compareUrlFor, type ForgeRepo } from "./forge.ts";
 import { commitAndPushUniqueFile, resolveStartSha, runProc, writeUniqueCommit } from "./git.ts";
 import type { CheckStatus, Clock, TicketOutcome, TicketSpec, ThrottleAdapterKind } from "./types.ts";
+
+export { isConflictOrRace, isGitConflict } from "./conflicts.ts";
 
 export interface PrAdapter {
   readonly kind: ThrottleAdapterKind;
@@ -131,6 +137,32 @@ export function classifyLiveFailure(message: string, pushed: boolean): {
   return { status: "error", httpStatus: 500 };
 }
 
+
+export interface ConflictRetryHooks {
+  merge(): Promise<void>;
+  resolve(message: string): Promise<void>;
+}
+
+export async function mergeWithConflictRetry(
+  hooks: ConflictRetryHooks,
+  maxAttempts = 8,
+): Promise<void> {
+  let lastError = "merge failed";
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await hooks.merge();
+      return;
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : "merge failed";
+      if (!isConflictOrRace(lastError) || attempt === maxAttempts) {
+        throw err;
+      }
+      await hooks.resolve(lastError);
+    }
+  }
+  throw new Error(lastError);
+}
+
 export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
   let frozenSha = options.startSha ?? null;
   const payloads = new Map<string, string>();
@@ -186,6 +218,19 @@ export function createLiveAdapter(options: LiveAdapterOptions): PrAdapter {
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : "live open failed";
+        if (isConflictOrRace(message)) {
+          try {
+            await resolveWorkspaceConflicts({
+              repoDir: options.repoDir,
+              remote: options.forgeRepo.remote,
+              baseBranch: options.baseBranch,
+              ownedPaths: [ticket.path],
+              message,
+            });
+          } catch {
+            // keep the original open error
+          }
+        }
         const classified = classifyLiveFailure(message, pushed);
         return {
           ticketId: ticket.ticketId,
@@ -422,26 +467,30 @@ export async function mergeIndependentChange(options: {
   outcome: TicketOutcome;
   body: string;
 }): Promise<void> {
-  let lastError = "merge failed";
-  for (let attempt = 1; attempt <= 8; attempt += 1) {
-    try {
+  await mergeWithConflictRetry({
+    merge: async () => {
       if (options.forgeRepo.forge === "origin" && options.outcome.prNumber) {
         await clearOriginStack(options.repoDir, options.forgeRepo.slug, String(options.outcome.prNumber));
       }
       await mergeChange(options.repoDir, options.forgeRepo, options.outcome);
-      return;
-    } catch (err) {
-      lastError = err instanceof Error ? err.message : "merge failed";
-      if (!isMergeRace(lastError) || attempt === 8) {
-        throw err;
+    },
+    resolve: async (message) => {
+      if (isMergeRace(message)) {
+        await restackOntoMain(options);
+      } else {
+        await resolveWorkspaceConflicts({
+          repoDir: options.repoDir,
+          remote: options.forgeRepo.remote,
+          baseBranch: options.baseBranch,
+          ownedPaths: [options.outcome.path],
+          message,
+        });
       }
-      await restackOntoMain(options);
       await new Promise<void>((resolve) => {
-        setTimeout(resolve, 80 * attempt);
+        setTimeout(resolve, 80);
       });
-    }
-  }
-  throw new Error(lastError);
+    },
+  });
 }
 
 async function restackOntoMain(options: {

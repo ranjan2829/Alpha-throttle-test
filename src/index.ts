@@ -16,7 +16,18 @@ export {
 } from "./dashboard-improve.ts";
 export { DASHBOARD_REPAIRS, unpublishedRepairs } from "./dashboard-repairs.ts";
 export { resolveAgentTarget, policyForAgentTarget } from "./agent.ts";
-export { createGate, parseCreatedChange, isMergeRace } from "./throttle/adapter.ts";
+export {
+  createGate,
+  parseCreatedChange,
+  isMergeRace,
+  isConflictOrRace,
+  mergeWithConflictRetry,
+} from "./throttle/adapter.ts";
+export {
+  classifyConflictPath,
+  rememberConflict,
+  resolveWorkspaceConflicts,
+} from "./throttle/conflicts.ts";
 export { learn, plannedBurst, summarizeOutcomes } from "./throttle/policy.ts";
 export { SAFE_POLICY, LIVE_DEFAULT_MAX, EXTREME_UNTIL_MERGED } from "./throttle/types.ts";
 export {

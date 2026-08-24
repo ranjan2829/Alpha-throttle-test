@@ -12,6 +12,7 @@ import { renderTree, runOrchestrator } from "./orchestrator.ts";
 import { decomposeGoal } from "./planner.ts";
 import { ensureWorkspace, loadPlan, loadState, savePlan, workspacePaths } from "./store.ts";
 import { createDryRunAdapter, createLiveAdapter, systemClock } from "./throttle/adapter.ts";
+import { resolveWorkspaceConflicts } from "./throttle/conflicts.ts";
 import { DEFAULT_GITHUB_MIRROR, DEFAULT_ORIGIN_REPO, parseForgeFlag, parseRepoSlug } from "./throttle/forge.ts";
 import { runOriginHost } from "./throttle/host.ts";
 import { runThrottleLoop } from "./throttle/loop.ts";
@@ -38,6 +39,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return commandThrottle(args);
     case "agent":
       return commandAgent(args);
+    case "resolve-conflicts":
+      return commandResolveConflicts(args);
     case "origin-setup":
       return commandOriginSetup(args);
     case "origin-finish":
@@ -409,6 +412,21 @@ async function commandOriginFinish(args: CliArgs): Promise<number> {
   return result.errors > 0 || result.buildFailed > 0 ? 1 : 0;
 }
 
+async function commandResolveConflicts(args: CliArgs): Promise<number> {
+  const repoDir = args.flags.get("repo-dir") ?? process.cwd();
+  const owned = args.flags.get("owned");
+  const remote = args.flags.get("remote");
+  const result = await resolveWorkspaceConflicts({
+    repoDir,
+    baseBranch: args.flags.get("base") ?? "main",
+    commit: !args.switches.has("no-commit"),
+    ...(remote ? { remote } : {}),
+    ...(owned ? { ownedPaths: owned.split(",").map((item) => item.trim()).filter((item) => item.length > 0) } : {}),
+  });
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  return result.files.some((file) => !file.resolved) ? 1 : 0;
+}
+
 function commandOriginSetup(args: CliArgs): number {
   const originSlug = args.flags.get("repo") ?? DEFAULT_ORIGIN_REPO;
   const githubSlug = args.flags.get("github") ?? DEFAULT_GITHUB_MIRROR;
@@ -514,6 +532,8 @@ Usage:
   npx tsx src/cli.ts throttle [--workspace .alpha/throttle]
       [--rate 2] [--max 8] [--concurrency 2] [--episodes 3]
       [--throttle-after 0]
+  npx tsx src/cli.ts resolve-conflicts [--repo-dir .] [--base main]
+      [--remote origin] [--owned tickets/0001.md] [--no-commit]
   npx tsx src/cli.ts origin-setup [--repo ranjan-rgb/Alpha-throttle-test]
       [--github ranjan2829/Alpha-throttle-test] [--no-push]
   npx tsx src/cli.ts origin-finish [--repo allocations/Alpha-throttle-test]

@@ -5,6 +5,7 @@ import { planBurstSplit, type BurstPlanner, type ClaudeClient } from "../claude.
 import type { Handoff, Plan, PlanTask } from "../types.ts";
 import { DEFAULT_BOUNDS } from "../types.ts";
 import type { PrAdapter } from "./adapter.ts";
+import { defaultConflictMemoryPath, loadConflictMemory } from "./conflicts.ts";
 import { learn, plannedBurst, summarizeOutcomes } from "./policy.ts";
 import {
   appendEpisode,
@@ -112,8 +113,9 @@ export async function runThrottleLoop(options: ThrottleRunOptions): Promise<Thro
     });
     const stats = summarizeOutcomes(outcomes);
     const next = learn(policy, stats, clock.now());
+    const conflictNotes = notesFromConflictMemory(options.workspace);
     const handoffs = outcomes.flatMap((outcome) => [
-      workerHandoff(outcome),
+      workerHandoff(outcome, conflictNotes),
       verifierHandoff(outcome),
     ]);
     const plan = burstPlan(tickets, policy);
@@ -256,7 +258,14 @@ async function runBurst(args: {
   return outcomes.sort((a, b) => a.seq - b.seq);
 }
 
-function workerHandoff(outcome: TicketOutcome): Handoff {
+function notesFromConflictMemory(workspace: string): string[] {
+  const memory = loadConflictMemory(defaultConflictMemoryPath(workspace));
+  return memory.entries.map(
+    (entry) => `conflict ${entry.path} → ${entry.strategy} (${entry.kind})`,
+  );
+}
+
+function workerHandoff(outcome: TicketOutcome, conflictNotes: string[]): Handoff {
   return {
     schemaVersion: 1,
     taskName: `ticket-${String(outcome.seq).padStart(4, "0")}`,
@@ -270,6 +279,7 @@ function workerHandoff(outcome: TicketOutcome): Handoff {
       `pr=${outcome.prUrl ?? "none"}`,
       `checks=${outcome.checkStatus}/${outcome.checkCount}`,
       `mergeMs=${outcome.mergeMs ?? "none"}`,
+      ...conflictNotes,
     ],
     followUps: [],
     attempt: 1,
