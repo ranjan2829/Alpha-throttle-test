@@ -1,0 +1,24 @@
+.shell { width: min(1200px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 72px; float: none; }
+.hero {
+  display: grid; gap: 20px; grid-template-columns: 1.4fr 0.8fr;
+  background: linear-gradient(180deg, #141a26, var(--card));
+  border: 1px solid var(--line); border-radius: 22px; padding: 24px;
+  margin-bottom: 16px; transform: none;
+}
+.eyebrow { margin: 0 0 6px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.hero h2 { margin: 0 0 8px; font-size: clamp(26px, 4vw, 38px); }
+.lede { margin: 0; max-width: 60ch; }
+.hero-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0; }
+.hero-facts div { background: #0c1018; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.hero-facts dt { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+.hero-facts dd { margin: 4px 0 0; font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+.kpis, .speed { display: grid; gap: 12px; margin: 0 0 16px; }
+.kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.speed { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kpi, .speed-card {
+  float: none; width: auto; background: var(--card);
+  border: 1px solid var(--line); border-radius: 16px; padding: 14px;
+}
+.kpi-val, .speed-num { margin: 0; font-family: "IBM Plex Mono", monospace; font-size: 24px; font-weight: 600; }
+.hint, .speed-sub { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.speed-card.accent { background: linear-gradient(180deg, #16382f, #121722); }

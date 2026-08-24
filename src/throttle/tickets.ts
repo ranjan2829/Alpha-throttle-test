@@ -10,7 +10,7 @@ export function makeTicket(seq: number, runId: string, at: string): TicketSpec {
     ticketId,
     seq,
     branch,
-    path: `tickets/${padded}.md`,
+    path: `tickets/${runId}/${padded}.md`,
     title: `throttle ticket ${padded}`,
     body: `throttle-ticket ${ticketId} ${at}\n`,
   };

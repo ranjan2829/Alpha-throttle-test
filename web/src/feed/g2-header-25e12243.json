@@ -1,0 +1,15 @@
+{
+  "id": "g2-header-25e12243",
+  "generation": 2,
+  "title": "Header that actually lays out",
+  "summary": "Separated brand, generation memory, and the Improve action so they no longer overlap.",
+  "acceptedAt": "2026-08-24T09:04:36.962Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g2-header-25e12243",
+    "kind": "copy",
+    "title": "Header that actually lays out",
+    "body": "Chip and primary button stay on one row on desktop.",
+    "tone": "mint"
+  }
+}

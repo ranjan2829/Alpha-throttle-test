@@ -1,0 +1,15 @@
+{
+  "id": "g3-layout-763bc932",
+  "generation": 3,
+  "title": "Page width, hero, and KPI grid",
+  "summary": "Constrained the shell, un-rotated the hero, and put the 10k stats on a real grid.",
+  "acceptedAt": "2026-08-24T09:04:36.963Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g3-layout-763bc932",
+    "kind": "copy",
+    "title": "Page width, hero, and KPI grid",
+    "body": "Do not let KPIs float or the shell exceed the viewport.",
+    "tone": "mint"
+  }
+}

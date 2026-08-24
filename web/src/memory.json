@@ -1,0 +1,144 @@
+{
+  "generation": 6,
+  "qualityBar": "highest",
+  "defects": [
+    {
+      "id": "type",
+      "title": "Unreadable type and broken colors",
+      "status": "fixed",
+      "notes": "Comic Sans, clashing yellow/magenta, no box-sizing."
+    },
+    {
+      "id": "header",
+      "title": "Header overlaps and floats apart",
+      "status": "fixed",
+      "notes": "Brand, generation chip, and Improve button sit on top of each other."
+    },
+    {
+      "id": "layout",
+      "title": "No page layout",
+      "status": "fixed",
+      "notes": "Shell is too wide, hero is rotated, KPIs float and overflow."
+    },
+    {
+      "id": "cards",
+      "title": "Pipeline and widgets have no structure",
+      "status": "fixed",
+      "notes": "Steps and worker cards are raw blocks with no rhythm."
+    },
+    {
+      "id": "tree",
+      "title": "Depth tree and memory are unusable",
+      "status": "fixed",
+      "notes": "Nested nodes collapse; memory of prior work is easy to miss."
+    },
+    {
+      "id": "polish",
+      "title": "No quality pass or mobile layout",
+      "status": "fixed",
+      "notes": "No spacing system, no responsive stack, no visual hierarchy."
+    }
+  ],
+  "history": [
+    {
+      "generation": 1,
+      "defectId": "type",
+      "title": "Readable type and color system",
+      "summary": "Replaced the broken type with a real dark palette, box-sizing, and Instrument Sans.",
+      "files": [
+        "patches/g1-type-94b67a20.css",
+        "memory.json"
+      ],
+      "notes": "Highest-quality base tokens. Later patches must keep contrast and box-sizing.",
+      "acceptedAt": "2026-08-24T09:04:36.961Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 2,
+      "defectId": "header",
+      "title": "Header that actually lays out",
+      "summary": "Separated brand, generation memory, and the Improve action so they no longer overlap.",
+      "files": [
+        "patches/g2-header-25e12243.css",
+        "memory.json"
+      ],
+      "notes": "Chip and primary button stay on one row on desktop.",
+      "acceptedAt": "2026-08-24T09:04:36.962Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 3,
+      "defectId": "layout",
+      "title": "Page width, hero, and KPI grid",
+      "summary": "Constrained the shell, un-rotated the hero, and put the 10k stats on a real grid.",
+      "files": [
+        "patches/g3-layout-763bc932.css",
+        "memory.json"
+      ],
+      "notes": "Do not let KPIs float or the shell exceed the viewport.",
+      "acceptedAt": "2026-08-24T09:04:36.963Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 4,
+      "defectId": "cards",
+      "title": "Pipeline and widget cards",
+      "summary": "Gave planner / worker / verifier / merge and worker widgets a shared card language.",
+      "files": [
+        "patches/g4-cards-37621d12.css",
+        "memory.json"
+      ],
+      "notes": "Tone stripes stay; no dotted magenta leftovers.",
+      "acceptedAt": "2026-08-24T09:04:36.963Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 5,
+      "defectId": "tree",
+      "title": "Recursive tree and agent memory",
+      "summary": "Made the depth tree scannable and pinned the memory of every accepted repair.",
+      "files": [
+        "patches/g5-tree-ee673744.css",
+        "memory.json"
+      ],
+      "notes": "Memory is the source of truth. Do not hide open defects.",
+      "acceptedAt": "2026-08-24T09:04:36.963Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 6,
+      "defectId": "polish",
+      "title": "Quality pass and mobile stack",
+      "summary": "Tightened spacing, shadows, and a one-column mobile layout so the repaired UI holds up in a screenshot.",
+      "files": [
+        "patches/g6-polish-3cb15989.css",
+        "memory.json"
+      ],
+      "notes": "Last open defect. After this the agent has rebuilt the console from memory.",
+      "acceptedAt": "2026-08-24T09:04:36.964Z",
+      "worker": "cli-dashboard-improve"
+    }
+  ],
+  "doNotRegress": [
+    "box-sizing: border-box",
+    "readable dark palette",
+    "Instrument Sans",
+    "Readable type and color system",
+    "header flex layout",
+    "generation chip readable",
+    "Header that actually lays out",
+    "max-width shell",
+    "KPI css grid",
+    "hero not rotated",
+    "Page width, hero, and KPI grid",
+    "pipeline 4-up cards",
+    "widget card language",
+    "Pipeline and widget cards",
+    "visible memory history",
+    "depth tree indentation",
+    "Recursive tree and agent memory",
+    "mobile single column",
+    "consistent 12/16/24 rhythm",
+    "Quality pass and mobile stack"
+  ]
+}
