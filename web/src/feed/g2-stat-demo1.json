@@ -1,0 +1,17 @@
+{
+  "id": "g2-stat-demo1",
+  "generation": 2,
+  "title": "Zero 429s",
+  "summary": "Pinned a callout for the 0 HTTP 429s measured on the live forge.",
+  "acceptedAt": "2026-08-24T08:19:37.490Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g2-stat-demo1",
+    "kind": "stat",
+    "title": "Zero 429s",
+    "body": "Origin stayed under the rate ceiling for the full 68 minutes.",
+    "tone": "mint",
+    "value": "0",
+    "unit": "429s"
+  }
+}

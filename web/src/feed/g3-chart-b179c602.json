@@ -1,0 +1,20 @@
+{
+  "id": "g3-chart-b179c602",
+  "generation": 3,
+  "title": "Error mix",
+  "summary": "Broke 472 errors out from the 10 000 merged so the demo is honest.",
+  "acceptedAt": "2026-08-24T08:20:20.053Z",
+  "worker": "dashboard-ui",
+  "widget": {
+    "id": "widget-g3-chart-b179c602",
+    "kind": "chart",
+    "title": "Error mix",
+    "body": "Errors were retries and races, not a failed target. 10 000 still merged.",
+    "tone": "amber",
+    "series": [
+      10000,
+      472,
+      0
+    ]
+  }
+}

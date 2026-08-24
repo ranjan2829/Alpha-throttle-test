@@ -1,0 +1,15 @@
+{
+  "id": "g4-copy-63dab14e",
+  "generation": 4,
+  "title": "Sharper hero line",
+  "summary": "Rewrote the dashboard lede to say what the recursive agent actually does.",
+  "acceptedAt": "2026-08-24T08:34:53.433Z",
+  "worker": "dashboard-ui",
+  "widget": {
+    "id": "widget-g4-copy-63dab14e",
+    "kind": "copy",
+    "title": "Sharper hero line",
+    "body": "Claude (or Grok 4.6) splits the goal. Leaves write one unique file, open one Origin PR, merge-commit.",
+    "tone": "violet"
+  }
+}
