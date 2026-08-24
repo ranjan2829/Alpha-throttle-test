@@ -37,8 +37,9 @@ function writeCommit(repo: string, relPath: string, body: string, message: strin
 
 test("unique-file conflict keeps ours", async () => {
   const repo = initRepo();
-  writeCommit(repo, "tickets/0001.md", "ours ticket\n", "ours ticket");
+  writeCommit(repo, "tickets/0001.md", "shared ticket\n", "seed unique file");
   execFileSync("git", ["checkout", "-b", "worker"], { cwd: repo });
+  writeCommit(repo, "tickets/0001.md", "ours ticket\n", "ours ticket");
   execFileSync("git", ["checkout", "main"], { cwd: repo });
   writeCommit(repo, "tickets/0001.md", "main ticket\n", "main ticket");
   execFileSync("git", ["checkout", "worker"], { cwd: repo });
@@ -54,6 +55,7 @@ test("unique-file conflict keeps ours", async () => {
   assert.ok(file);
   assert.equal(file.strategy, "ours");
   assert.equal(file.resolved, true);
+  assert.equal(result.committed, true);
   const body = readFileSync(join(repo, "tickets/0001.md"), "utf8");
   assert.equal(body, "ours ticket\n");
   assert.equal(classifyConflictPath("tickets/0001.md", { ownedPaths: ["tickets/0001.md"] }), "ours");
@@ -79,6 +81,7 @@ test("main-only file keeps theirs", async () => {
   assert.ok(file);
   assert.equal(file.strategy, "theirs");
   assert.equal(file.resolved, true);
+  assert.equal(result.committed, true);
   const body = readFileSync(join(repo, "src/from-main.ts"), "utf8");
   assert.equal(body, "from main\n");
   assert.equal(classifyConflictPath("src/from-main.ts", { ownedPaths: ["tickets/0002.md"] }), "theirs");

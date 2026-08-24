@@ -396,7 +396,12 @@ export async function resolveWorkspaceConflicts(
   let commitSha: string | null = null;
   let committed = false;
   const stillUnmerged = await listUnmergedFiles(repoDir);
-  if (shouldCommit && stillUnmerged.length === 0 && (await hasStagedChanges(repoDir))) {
+  const stillMerging = (await detectMergeOperation(repoDir)) !== "none";
+  if (
+    shouldCommit &&
+    stillUnmerged.length === 0 &&
+    (stillMerging || (await hasStagedChanges(repoDir)))
+  ) {
     commitSha = await commitResolution(repoDir, "Resolve merge conflicts (agent)");
     committed = true;
   }
