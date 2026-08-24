@@ -1,0 +1,15 @@
+{
+  "id": "g12-kpi-hierarchy-c61d2859",
+  "generation": 12,
+  "title": "KPI visual hierarchy",
+  "summary": "Made merged the hero metric and put supporting 10k stats on a quieter scale.",
+  "acceptedAt": "2026-08-24T09:16:53.785Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g12-kpi-hierarchy-c61d2859",
+    "kind": "copy",
+    "title": "KPI visual hierarchy",
+    "body": "Merged stays loud. Do not equalize every KPI or restore 400-ticket labels.",
+    "tone": "mint"
+  }
+}

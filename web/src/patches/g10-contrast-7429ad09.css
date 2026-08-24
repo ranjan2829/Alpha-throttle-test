@@ -1,0 +1,10 @@
+:root {
+  --text: #eef2f8;
+  --muted: #9aa3b5;
+  --line: #2b3344;
+}
+p, .lede, .pipe p, .widget p { color: #c8d0de; }
+.hint, .speed-sub, .worker, .gen-label, .eyebrow, .pipe-idx { color: var(--muted); }
+.broken-banner { color: #ffd089; background: #2a1d12; border-color: #6a4a24; }
+.notice { color: #9ff6dc; }
+.memory-item.open h3, .feed-item.selected h3 { color: var(--text); }

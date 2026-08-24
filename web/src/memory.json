@@ -1,5 +1,5 @@
 {
-  "generation": 6,
+  "generation": 19,
   "qualityBar": "highest",
   "defects": [
     {
@@ -37,6 +37,84 @@
       "title": "No quality pass or mobile layout",
       "status": "fixed",
       "notes": "No spacing system, no responsive stack, no visual hierarchy."
+    },
+    {
+      "id": "type-scale",
+      "title": "Modular type scale",
+      "status": "fixed",
+      "notes": "Locked a 12/14/16/22/28/38 scale so titles, kicker, and body stay in one family."
+    },
+    {
+      "id": "spacing",
+      "title": "Spacing rhythm",
+      "status": "fixed",
+      "notes": "Replaced ad-hoc gaps with a 4px rhythm so cards, panels, and the shell share one beat."
+    },
+    {
+      "id": "focus",
+      "title": "Visible focus states",
+      "status": "fixed",
+      "notes": "Gave buttons, memory rows, and the Improve action a mint focus ring that survives dark UI."
+    },
+    {
+      "id": "contrast",
+      "title": "Contrast and muted text",
+      "status": "fixed",
+      "notes": "Raised muted copy and borders so captions stay AA against the dark cards."
+    },
+    {
+      "id": "tree-polish",
+      "title": "Depth tree polish",
+      "status": "fixed",
+      "notes": "Role dots, status edges, and hanging gutters make the recursive tree scannable at a glance."
+    },
+    {
+      "id": "kpi-hierarchy",
+      "title": "KPI visual hierarchy",
+      "status": "fixed",
+      "notes": "Made merged the hero metric and put supporting 10k stats on a quieter scale."
+    },
+    {
+      "id": "motion",
+      "title": "Subtle motion",
+      "status": "fixed",
+      "notes": "Added short, low-amplitude transitions on hover and paint so the UI feels finished, not jumpy."
+    },
+    {
+      "id": "memory-read",
+      "title": "Memory panel readability",
+      "status": "fixed",
+      "notes": "Separated open defects from accepted history and gave each row a clearer meta line."
+    },
+    {
+      "id": "a11y",
+      "title": "Accessibility landmarks",
+      "status": "fixed",
+      "notes": "Reduced motion, skip target, and hit-area fixes so the console is usable with keyboard and AT."
+    },
+    {
+      "id": "mobile-density",
+      "title": "Mobile density",
+      "status": "fixed",
+      "notes": "Tightened phone layout: smaller type, stacked actions, and cards that do not waste vertical space."
+    },
+    {
+      "id": "buttons",
+      "title": "Button states",
+      "status": "fixed",
+      "notes": "Primary and ghost now have hover, active, and disabled treatments that match the mint system."
+    },
+    {
+      "id": "elevation",
+      "title": "Layered elevation",
+      "status": "fixed",
+      "notes": "Hero and panels sit above the page wash; inner cards stay flatter so depth reads as hierarchy."
+    },
+    {
+      "id": "tabular",
+      "title": "Tabular numbers",
+      "status": "fixed",
+      "notes": "Generation chip, KPIs, and tree depth use IBM Plex Mono tabular figures so columns do not jitter."
     }
   ],
   "history": [
@@ -117,6 +195,175 @@
       "notes": "Last open defect. After this the agent has rebuilt the console from memory.",
       "acceptedAt": "2026-08-24T09:04:36.964Z",
       "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 7,
+      "defectId": "type-scale",
+      "title": "Modular type scale",
+      "summary": "Locked a 12/14/16/22/28/38 scale so titles, kicker, and body stay in one family.",
+      "files": [
+        "patches/g7-type-scale-a88be2c4.css",
+        "memory.json"
+      ],
+      "notes": "Keep Instrument Sans. Never restore Comic Sans or Papyrus after gen 0.",
+      "acceptedAt": "2026-08-24T09:14:30.086Z",
+      "worker": "dashboard-ui"
+    },
+    {
+      "generation": 8,
+      "defectId": "spacing",
+      "title": "Spacing rhythm",
+      "summary": "Replaced ad-hoc gaps with a 4px rhythm so cards, panels, and the shell share one beat.",
+      "files": [
+        "patches/g8-spacing-6b9edf8d.css",
+        "memory.json"
+      ],
+      "notes": "4 / 8 / 12 / 16 / 24 / 32. Do not invent random pixel gaps.",
+      "acceptedAt": "2026-08-24T09:16:53.782Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 9,
+      "defectId": "focus",
+      "title": "Visible focus states",
+      "summary": "Gave buttons, memory rows, and the Improve action a mint focus ring that survives dark UI.",
+      "files": [
+        "patches/g9-focus-0f4df5d4.css",
+        "memory.json"
+      ],
+      "notes": "Keyboard users must see where they are. Do not remove outlines.",
+      "acceptedAt": "2026-08-24T09:16:53.783Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 10,
+      "defectId": "contrast",
+      "title": "Contrast and muted text",
+      "summary": "Raised muted copy and borders so captions stay AA against the dark cards.",
+      "files": [
+        "patches/g10-contrast-7429ad09.css",
+        "memory.json"
+      ],
+      "notes": "Muted is #9aa3b5 minimum. Do not drop body text below #c2cad8.",
+      "acceptedAt": "2026-08-24T09:16:53.783Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 11,
+      "defectId": "tree-polish",
+      "title": "Depth tree polish",
+      "summary": "Role dots, status edges, and hanging gutters make the recursive tree scannable at a glance.",
+      "files": [
+        "patches/g11-tree-polish-334805cc.css",
+        "memory.json"
+      ],
+      "notes": "Keep left-rail kids and depth badges. Do not collapse nested nodes.",
+      "acceptedAt": "2026-08-24T09:16:53.784Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 12,
+      "defectId": "kpi-hierarchy",
+      "title": "KPI visual hierarchy",
+      "summary": "Made merged the hero metric and put supporting 10k stats on a quieter scale.",
+      "files": [
+        "patches/g12-kpi-hierarchy-c61d2859.css",
+        "memory.json"
+      ],
+      "notes": "Merged stays loud. Do not equalize every KPI or restore 400-ticket labels.",
+      "acceptedAt": "2026-08-24T09:16:53.785Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 13,
+      "defectId": "motion",
+      "title": "Subtle motion",
+      "summary": "Added short, low-amplitude transitions on hover and paint so the UI feels finished, not jumpy.",
+      "files": [
+        "patches/g13-motion-c9bd0e97.css",
+        "memory.json"
+      ],
+      "notes": "150–180ms, opacity and border only. No bounce, no spin.",
+      "acceptedAt": "2026-08-24T09:16:53.785Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 14,
+      "defectId": "memory-read",
+      "title": "Memory panel readability",
+      "summary": "Separated open defects from accepted history and gave each row a clearer meta line.",
+      "files": [
+        "patches/g14-memory-read-c5a5aef3.css",
+        "memory.json"
+      ],
+      "notes": "Memory remains the source of truth. Do not hide history.",
+      "acceptedAt": "2026-08-24T09:16:53.786Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 15,
+      "defectId": "a11y",
+      "title": "Accessibility landmarks",
+      "summary": "Reduced motion, skip target, and hit-area fixes so the console is usable with keyboard and AT.",
+      "files": [
+        "patches/g15-a11y-2bf375e6.css",
+        "memory.json"
+      ],
+      "notes": "Honor prefers-reduced-motion. Keep 44px targets on primary actions.",
+      "acceptedAt": "2026-08-24T09:16:53.786Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 16,
+      "defectId": "mobile-density",
+      "title": "Mobile density",
+      "summary": "Tightened phone layout: smaller type, stacked actions, and cards that do not waste vertical space.",
+      "files": [
+        "patches/g16-mobile-density-aa081ceb.css",
+        "memory.json"
+      ],
+      "notes": "Phone is a first-class surface. Keep one column under 640px.",
+      "acceptedAt": "2026-08-24T09:16:53.787Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 17,
+      "defectId": "buttons",
+      "title": "Button states",
+      "summary": "Primary and ghost now have hover, active, and disabled treatments that match the mint system.",
+      "files": [
+        "patches/g17-buttons-6e121482.css",
+        "memory.json"
+      ],
+      "notes": "Disabled is wait, not invisible. Keep the mint fill.",
+      "acceptedAt": "2026-08-24T09:16:53.788Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 18,
+      "defectId": "elevation",
+      "title": "Layered elevation",
+      "summary": "Hero and panels sit above the page wash; inner cards stay flatter so depth reads as hierarchy.",
+      "files": [
+        "patches/g18-elevation-88acad7a.css",
+        "memory.json"
+      ],
+      "notes": "One shadow language. No neon glow.",
+      "acceptedAt": "2026-08-24T09:16:53.789Z",
+      "worker": "cli-dashboard-improve"
+    },
+    {
+      "generation": 19,
+      "defectId": "tabular",
+      "title": "Tabular numbers",
+      "summary": "Generation chip, KPIs, and tree depth use IBM Plex Mono tabular figures so columns do not jitter.",
+      "files": [
+        "patches/g19-tabular-661030b3.css",
+        "memory.json"
+      ],
+      "notes": "Mono is for numbers only. Body copy stays Instrument Sans.",
+      "acceptedAt": "2026-08-24T09:16:53.789Z",
+      "worker": "cli-dashboard-improve"
     }
   ],
   "doNotRegress": [
@@ -139,6 +386,39 @@
     "Recursive tree and agent memory",
     "mobile single column",
     "consistent 12/16/24 rhythm",
-    "Quality pass and mobile stack"
+    "Quality pass and mobile stack",
+    "modular type scale",
+    "no Comic Sans after gen 0",
+    "Modular type scale",
+    "4px spacing rhythm",
+    "Spacing rhythm",
+    "visible mint focus ring",
+    "Visible focus states",
+    "AA muted contrast",
+    "body text #c2cad8",
+    "Contrast and muted text",
+    "role legend dots",
+    "tree status edges",
+    "Depth tree polish",
+    "merged KPI emphasis",
+    "no 400-ticket labels",
+    "KPI visual hierarchy",
+    "subtle 160ms transitions",
+    "Subtle motion",
+    "defect / history separation",
+    "readable memory meta",
+    "Memory panel readability",
+    "prefers-reduced-motion",
+    "44px action targets",
+    "Accessibility landmarks",
+    "compact 640px density",
+    "Mobile density",
+    "primary mint fill",
+    "ghost border button",
+    "Button states",
+    "layered card elevation",
+    "Layered elevation",
+    "tabular mono numbers",
+    "Tabular numbers"
   ]
 }

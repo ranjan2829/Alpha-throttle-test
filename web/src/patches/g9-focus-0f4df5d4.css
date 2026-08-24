@@ -1,0 +1,14 @@
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 3px;
+}
+.primary:focus-visible { outline-color: #04110c; outline-offset: 3px; box-shadow: 0 0 0 4px rgba(61, 255, 200, 0.45); }
+.ghost:focus-visible, .feed-item:focus-visible, .memory-item:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+}
+.feed-item, .memory-item { cursor: pointer; }
+.feed-item:hover, .memory-item:hover { border-color: #3a4558; }
+button.primary:hover { filter: brightness(1.04); }
+button.ghost:hover { background: #171d28; }

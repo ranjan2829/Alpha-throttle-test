@@ -1,0 +1,15 @@
+{
+  "id": "g11-tree-polish-334805cc",
+  "generation": 11,
+  "title": "Depth tree polish",
+  "summary": "Role dots, status edges, and hanging gutters make the recursive tree scannable at a glance.",
+  "acceptedAt": "2026-08-24T09:16:53.784Z",
+  "worker": "cli-dashboard-improve",
+  "widget": {
+    "id": "widget-g11-tree-polish-334805cc",
+    "kind": "copy",
+    "title": "Depth tree polish",
+    "body": "Keep left-rail kids and depth badges. Do not collapse nested nodes.",
+    "tone": "mint"
+  }
+}

@@ -1,0 +1,12 @@
+@media (max-width: 640px) {
+  .shell { width: calc(100% - 16px); padding: 12px 0 56px; }
+  .top { margin-bottom: 14px; }
+  .brand { gap: 10px; }
+  .mark { width: 36px; height: 36px; font-size: 18px; border-radius: 10px; }
+  .hero, .panel, .pipe, .widget, .kpi, .speed-card { padding: 12px; border-radius: 14px; }
+  .hero h2 { font-size: 1.45rem; }
+  .kpi-val, .speed-num { font-size: 20px; }
+  .gen { width: 100%; justify-content: space-between; }
+  .top-meta { width: 100%; }
+  .feed-item, .memory-item, .node-card { padding: 10px; }
+}

@@ -1,0 +1,5 @@
+.gen-num, .kpi-val, .speed-num, .widget-val, .pipe-idx, .node-card .depth, .pill {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.hero-facts dd { font-variant-numeric: tabular-nums; }

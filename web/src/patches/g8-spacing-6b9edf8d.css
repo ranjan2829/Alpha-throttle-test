@@ -1,0 +1,15 @@
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+}
+.shell { padding: var(--space-5) 0 80px; }
+.top { gap: var(--space-4); margin-bottom: var(--space-5); }
+.hero, .panel, .pipe, .widget, .kpi, .speed-card { padding: var(--space-4); }
+.kpis, .speed, .pipeline, .widgets, .split { gap: var(--space-3); margin-bottom: var(--space-4); }
+.panel-head { margin-bottom: var(--space-3); gap: var(--space-3); }
+.feed, .memory { gap: var(--space-2); }
+.node-card { padding: 10px var(--space-3); margin-bottom: var(--space-2); }

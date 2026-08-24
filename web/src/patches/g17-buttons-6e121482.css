@@ -1,0 +1,8 @@
+.primary, .ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  letter-spacing: -0.01em;
+}
+.primary { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 8px 18px rgba(61, 255, 200, 0.12); }
+.primary:active { transform: translateY(1px); }
+.ghost:active { background: #121722; }
+.primary:disabled, .ghost:disabled { transform: none; filter: none; }
